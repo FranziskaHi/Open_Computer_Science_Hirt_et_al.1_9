@@ -1,0 +1,928 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# PREPARATIONS
+```{r echo=T, eval=F}
+# load packages
+library(tidyverse)
+library(stats)
+library(scatr)
+library(jmv)
+library(rstan)
+library(brms)
+library(bayesplot)
+library(ggmcmc) # for ggs posterior plot
+library(ggthemes)
+library(papaja)
+
+# set ggplot theme
+theme_set(theme_default())
+
+# set rstan options
+rstan::rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+## Selection of statistical methods
+- Bayesian statistics as more intuitive to interprete
+
+- Mixed models, because events (level 1) nested within subjects (level 2). But only random intercepts included, as random effects when only two rows per participant are hardly identifyable.
+
+- Treat emotional self-reports as ordinal outcome variables including edge effects in the data (i.e. many data points in the highest/lowest category). Cummulative family as we understand the Likert-scales as the categorization of a latent continuous construct (cf. Bürkner & Vuorre, 2019)
+
+- Assummption of equal variances: "If unequal variances are theoretically possible — and they usually are — we also recommend incorporating them into the model" (Bürkner & Vuorre, 2019). However, models allowing for unequal variances did not converge and were therefore omitted.
+
+- Not controlling for the effect of the specific texts as not enough levels (6) for random effects and when introduced as level 2 predictor, too conservative (the effect of the emotional differences between the texts would be removed).
+
+### Choosing link family:
+link-distributions (usually only minor impact on results):
+logit = logistic,
+probit = gaussian,
+cloglog = extreme value distribution
+http://bayesium.com/which-link-function-logit-probit-or-cloglog/
+
+The choice should be made based on some combination of:
+- Knowledge of the response distribution,
+- Theoretical considerations, and
+- Empirical fit to the data.
+https://stats.stackexchange.com/questions/20523/difference-between-logit-and-probit-models
+
+### interpretation of summary of fitted model
+- Estimate is the mean of the posterior distribution, and corresponds to the frequentist point estimate
+- Est.Error is the standard deviation of the posterior distribution
+- thresholds in ordinal models are called "intercepts"
+marginal effects for ordinal models: https://github.com/paul-buerkner/brms/issues/190
+
+### posterior predictive checks
+for ordinal models pp_check not adequate: https://github.com/stan-dev/bayesplot/issues/73
+ppc: https://mc-stan.org/bayesplot/articles/graphical-ppcs.html
+
+## load data
+```{r}
+# load data
+df <- read_csv("df_TEEM_final.csv")
+
+# rename some variables
+df <- df %>% dplyr::rename("participant" = "subject_nr", "text" = "text_pic", "valence_post" = "SAM_LIKERT_POST")
+```
+
+
+## standardize predictors (helps for model convergence and for the interpretation of the interaction effects)
+```{r echo=T, eval=F}
+df <- df %>% 
+  mutate(
+    mean_interest = scale(mean_interest, center = T, scale = T),
+    mean_boredom = scale(mean_boredom, center = T, scale = T),
+    mean_valence = scale(mean_valence, center = T), scale = T)
+
+df <- df %>% 
+  mutate(
+    sd_interest = scale(sd_interest, center = T, scale = T),
+    sd_boredom = scale(sd_boredom, center = T, scale = T),
+    sd_valence = scale(sd_valence, center = T), scale = T)
+
+df <- df %>% 
+  mutate(
+    peak10_interest = scale(peak10_interest, center = T, scale = T),
+    peak10_boredom = scale(peak10_boredom, center = T, scale = T),
+    peak10_valence_pos = scale(peak10_valence_pos, center = T, scale = T),
+    peak10_valence_neg = scale(peak10_valence_neg), center = T, scale = T)
+```
+
+
+# 1. INTEREST
+## plot distributions of relevant variables
+```{r echo=T, eval=F}
+#plots
+# densities of self-reported boredom
+df %>%
+    ggplot(aes(x = interested_post, y = ..density..)) +
+        geom_histogram() 
+
+# mean FaceReader
+df %>%
+    ggplot(aes(x = mean_interest, y = ..density..)) +
+    geom_histogram()
+
+scat(
+    data = df,
+    x = "mean_interest",
+    y = "interested_post",
+    marg = "dens",
+    line = "smooth",
+    se = TRUE
+    )
+# SD of mean FaceReader
+df %>%
+    ggplot(aes(x = sd_interest, y = ..density..)) +
+    geom_histogram() 
+
+# peaks of FaceReader
+df %>%
+    ggplot(aes(x = peak10_interest, y = ..density..)) +
+    geom_histogram() 
+
+scat(
+    data = df,
+    x = "peak10_interest",
+    y = "interested_post",
+    marg = "dens",
+    line = "smooth",
+    se = TRUE
+    )
+```
+
+## INTEREST restricted model
+```{r echo=T, eval=F}
+# complete cases only (drop NAs)
+dfsub <- df %>% dplyr::select(participant, interested_post, mean_interest, sd_interest, peak10_interest)  %>% drop_na()
+dfsub
+
+# restricted model
+m0i_cloglog <- brm(
+          interested_post ~ 1 + (1|participant),
+          family = cumulative("cloglog"),                    
+          prior = prior(cauchy(0, 10), class = sd), 
+          iter = 4000, warmup = 2000, chains = 4, cores = 4,
+          inits = 0,
+          data = dfsub,
+          save_all_pars = T) # needed for bayes factor later on
+
+summary(m0i_cloglog)
+m0i_cloglog$prior
+
+# other link functions
+m0i_logit <-  update(m0i_cloglog,
+                    family = cumulative("logit"))
+
+m0i_probit <-  update(m0i_cloglog,
+                      family = cumulative("probit"))
+# compare different families using assimilation of leave-one-out-cross validation (looic)
+m0i_logit <- add_criterion(m0i_logit,"loo")
+m0i_probit <- add_criterion(m0i_probit,"loo", reloo = TRUE) #"reloo = TRUE" actually calculates MCMC for problematic observations 
+m0i_cloglog <- add_criterion(m0i_cloglog ,"loo", reloo = TRUE)
+print(loo_compare(m0i_logit, m0i_probit, m0i_cloglog, criterion="loo"), simplify = F)  # cloglog 1.5-3.5 SD better
+
+# pp-check -> as Y is ordinal --> ppc_bars (histogram instead of line)
+yrep_probit <- posterior_predict(m0i_probit, draws = 500) #matrix yrep of draws from the posterior predictive distribution
+yrep_cloglog <- posterior_predict(m0i_cloglog, drwas = 500)
+pp_check_icloglog <- bayesplot::ppc_bars(dfsub$interested_post, yrep_probit) # Yrep = simulated data; Y = actual data 
+pp_check_iprobit <- bayesplot::ppc_bars(dfsub$interested_post, yrep_cloglog)
+pp_check_icloglog 
+pp_check_iprobit # hard to tell which one fits better
+
+# chosen F distribution (Link function), final Null-Modell
+m0i <- m0i_cloglog
+```
+
+
+## INTEREST mean
+```{r echo=T, eval=F}
+# full model including FaceReader's estimate as predictor
+m1_imean <-  update(m0i, formula. = ~ . + mean_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)), 
+                    newdata = dfsub,
+                    save_all_pars = T, 
+                    sample_prior = TRUE)
+
+## model parameter
+summary(m1_imean)
+stanplot(m1_imeanxsd)
+stanplot(m1_imean, type = "trace") # visually inspect convergence
+m1_imean$prior
+
+# plots
+plot(marginal_effects(m1_imean, "mean_interest", method = "fitted", categorical = F), points = T) # shows the strong influence of two obervations
+  
+## posterior predictive checks
+yrep_m0 <- posterior_predict(m0i, draws = 500)
+yrep_m1 <- posterior_predict(m1_imean, draws = 500)
+ppc_m0i <- bayesplot::ppc_bars(dfsub$interested_post, yrep_m0) 
+ppc_m1_imean <- bayesplot::ppc_bars(dfsub$interested_post, yrep_m1)
+ppc_m0i
+ppc_m1_imean 
+
+## plot b densities and CIs
+m1_imean_ggs <- ggs(m1_imean) # transforms the brms output into a longformat tibble (used to make different types of plots)
+m1_imean_ggs
+ggplot(filter(m1_imean_ggs, Parameter=="b_mean_interest", Iteration>1000), aes(x=value))+
+  geom_density(fill="orange", alpha=.5)+geom_vline(xintercept = 0, col="red", size=1)+
+  scale_x_continuous(name="Value", limits=c(-1, 1)) + 
+  labs(title="Posterior density of regression coefficient for mean of FaceReader's interest estimates") +
+  theme_apa() + 
+  geom_vline(xintercept = summary(m1_imean)$fixed[5,3:4], col="blue", linetype=2) # 95% CrI
+
+## plot prior and posterior parameter densities https://www.rensvandeschoot.com/tutorials/brms-priors
+plot(hypothesis(m1_imean, "mean_interest>0", ignore_prior = F), plot = F, theme = theme_get())[[1]] + scale_x_continuous(limits=c(-1, 1)) # sample_prior = T needed in brms fit to plot prior
+
+
+###################################################### 
+# Model without "outliers"
+dfsub_out <- dfsub %>% 
+  filter(mean_interest < (mean(mean_interest) + 4*sd(mean_interest)) & mean_interest > (mean(mean_interest) - 4*sd(mean_interest))) 
+dfsub_out # two observations less
+
+dfsub %>% filter(mean_interest > (mean(mean_interest) + 4*sd(mean_interest)) | mean_interest < (mean(mean_interest) - 4*sd(mean_interest))) # ouliers are from one participant (highly expressive in video)
+
+
+m1_imean_out <-  update(m0i, formula. = ~ . + mean_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)), 
+                    newdata = dfsub_out,
+                    save_all_pars = T, 
+                    sample_prior = TRUE)
+summary(m1_imean_out)
+stanplot(m1_imean_out, type = "trace") # visually inspect convergence
+
+## plots    
+plot(marginal_effects(m1_imean_out, "mean_interest", method = "fitted", categorical = F), points = T)
+
+plot(hypothesis(m1_imean_out, "mean_interest>0", ignore_prior = F), plot = F, theme = theme_get())[[1]] + scale_x_continuous(limits=c(-1, 1)) # sample_prior = T needed in brms fit to plot prior
+
+# chose final model
+m1_imean <- m1_imean_out
+```
+
+
+
+## INTEREST SD * mean
+```{r echo=T, eval=F}
+# the participant from before also outlier in SD? --> No! --> leave it in
+dfsub_out %>% filter(sd_interest > (mean(sd_interest) + 4*sd(sd_interest)) | sd_interest < (mean(sd_interest) - 4*sd(mean_interest))) # ouliers are from one participant (highly expressive in Video: Stirnrunzeln, aufgerissene Augen)
+
+
+# full model including FaceReader's estimates as predictor
+m1_imeanxsd <-  update(m0i, formula. = ~ . + mean_interest*sd_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                    control = list(adapt_delta = 0.99),
+                    newdata = dfsub_out, # without outliers from mean interest
+                    save_all_pars = T)
+m1_imeanxsd$prior
+## model indicators 
+summary(m1_imeanxsd)
+stanplot(m1_imeanxsd, type = "trace") # visually inspect convergence
+stanplot(m1_imeanxsd)
+
+
+# plots
+plot(marginal_effects(m1_imeanxsd,"mean_interest:sd_interest"), points = T, point_args = list(width = 0.9, alpha = 0.6)) 
+plot(marginal_effects(m1_imeanxsd,"mean_interest"), points = T, point_args = list(width = 0.9, alpha = 0.6)) 
+plot(marginal_effects(m1_imeanxsd,"sd_interest"), points = T, point_args = list(width = 0.9, alpha = 0.6)) 
+
+# posterior predictive checks 
+Yrep_m1_imeanxsd <- posterior_predict(m1_imeanxsd, draws = 500)
+ppc_m1_imeanxsd <- bayesplot::ppc_bars(dfsub$interested_post, Yrep_m1_imeanxsd) 
+ppc_m1_imeanxsd
+```
+
+## INTEREST mean of peaks
+```{r echo=T, eval=F}
+#remove outliers from mean also in peak:
+dfsub_outpeak <- dfsub %>% filter(peak10_interest < (mean(peak10_interest) + 4*sd(peak10_interest)) & peak10_interest > (mean(peak10_interest) - 4*sd(peak10_interest))) 
+dfsub_outpeak
+
+dfsub %>% filter(peak10_interest > (mean(peak10_interest) + 4*sd(peak10_interest)) | peak10_interest < (mean(peak10_interest) - 4*sd(peak10_interest)))  # 2 ouliers are from the same participant as before
+
+# model including outliers
+m1_ipeak <- update(m0i, formula. = ~ . + peak10_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                              newdata = dfsub,
+                              save_all_pars = T)
+summary(m1_ipeak)
+stanplot(m1_ipeak)
+stanplot(m1_ipeak, type = "trace") # visually inspect convergence
+
+# model without outliers
+m1_ipeak_out <- update(m0i, formula. = ~ . + peak10_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                              newdata = dfsub_outpeak,
+                              control = list(adapt_delta = 0.99),
+                              save_all_pars = T)
+
+## model parameter 
+summary(m1_ipeak_out)
+stanplot(m1_ipeak_out)
+stanplot(m1_ipeak_out, type = "trace") # visually inspect convergence
+
+# plots
+plot(marginal_effects(m1_ipeak,"peak10_interest", categorical = F), points = T) 
+plot(marginal_effects(m1_ipeak_out,"peak10_interest", categorical = F), points = T)
+
+# posterior predictive checks
+Yrep_m1_ipeak <- posterior_predict(m1_ipeak, draws = 500)
+ppc_m1_m1_ipeak <- bayesplot::ppc_bars(dfsub$interested_post, Yrep_m1_ipeak) 
+ppc_m1_m1_ipeak
+
+# model comparison
+m1_ipeak <- add_criterion(m1_ipeak ,"waic")
+print(loo_compare(m1_ipeak, m0i, criterion="waic"), simplify = F)
+
+m1_peak <- m1_ipeak_out
+```
+
+## INTEREST model comparison
+loo_elpd: pairwise comparisons between each model and the model with the largest ELPD (the model in the first row). For this reason the elpd_diff column will always have the value 0 in the first row (i.e., the difference between the preferred model and itself) and negative values in subsequent rows for the remaining models. 
+https://avehtari.github.io/modelselection/rats_kcv.html
+
+```{r echo=T, eval=F}
+# loo (cross validation)
+m0i <- add_criterion(m0i, criterion = "loo") # 13 observations with a pareto_k > 0.7 
+m1_imean <- add_criterion(m1_imean, criterion = "loo") # 14 observations with a pareto_k > 0.7
+m1_ipeak <- add_criterion(m1_ipeak, criterion = "loo") # 21 observations with a pareto_k > 0.7
+m1_imeanxsd  <- add_criterion(m1_imeanxsd, criterion = "loo") # Found 14 observations with a pareto_k > 0.7
+print(loo_compare(m0i, m1_imean, m1_ipeak, m1_imeanxsd, criterion = "loo"), simplify = T)
+  
+## psis convergence diagnostic
+plot(m1_imean$loo, diagnostic = c("k", "n_eff"), main = "PSIS diagnostic plot") 
+plot(m1_ipeak$loo, diagnostic = c("k", "n_eff"), main = "PSIS diagnostic plot")
+
+
+# perform 10-fold cross validation (as in our case loo does not converge well)
+library(future)
+plan(multiprocess) # parallell processing
+
+m0i <- add_criterion(m0i, criterion =  "kfold", folds = "grouped", group = "participant")
+m1_imean <- add_criterion(m1_imean, criterion = "kfold", folds = "grouped", group = "participant")
+m1_ipeak <- add_criterion(m1_ipeak, criterion = "kfold", folds = "grouped", group = "participant")
+m1_imeanxsd <- add_criterion(m1_imeanxsd, criterion = "kfold", folds = "grouped", group = "participant")
+print(loo_compare(m0i, m1_imean, m1_ipeak, m1_imeanxsd, criterion = "kfold"), simplify = T)
+```
+
+# 2. BOREDOM
+## plot distributions of relevant variables
+```{r}
+#plots
+# densities of self-reported boredom
+df %>%
+    ggplot(aes(x = bored_post, y = ..density..)) +
+    facet_grid(~ text) +
+    geom_histogram() 
+
+# mean FaceReader
+df %>%
+    ggplot(aes(x = mean_boredom, y = ..density..)) +
+    geom_histogram()
+
+scat(
+    data = df,
+    x = "mean_boredom",
+    y = "bored_post",
+    marg = "dens",
+    line = "smooth",
+    se = TRUE
+    )
+# SD of mean FaceReader
+df %>%
+    ggplot(aes(x = sd_boredom , y = ..density..)) +
+    geom_histogram() # looks like binary + gaussian distribution
+
+# peaks of FaceReader
+dfsubb %>%
+    ggplot(aes(x = peak10_boredom, y = ..density..)) +
+    geom_histogram() # looks like binary + gaussian distribution
+
+scat(
+    data = df,
+    x = "peak10_boredom",
+    y = "bored_post",
+    marg = "dens",
+    line = "smooth",
+    se = TRUE
+    )
+
+```
+## BOREDOM restricted model
+
+```{r}
+# complete cases only (drop NAs)
+dfsubb <- df %>% dplyr::select(participant, bored_post, mean_boredom, sd_boredom, peak10_boredom) %>% drop_na()
+dfsubb
+
+# restricted model
+m0b_cloglog <- brm(
+          bored_post ~ 1 + (1|participant),
+          family = cumulative("cloglog"),
+          prior = prior(cauchy(0, 10), class = sd),
+          iter = 4000, warmup = 2000, chains = 4, cores = 4,
+          inits = 0,
+          data = dfsubb,
+          save_all_pars = T)
+
+summary(m0b_cloglog)
+stanplot(m0b_cloglog)
+stanplot(m0b_cloglog, type = "trace") # visually inspect convergence
+m0b_cloglog$prior
+
+# other link functions
+m0b_logit <-  update(m0b_cloglog,
+                    family = cumulative("logit"))
+
+m0b_probit <-  update(m0b_cloglog,
+                      family = cumulative("probit"))
+
+waic(m0b_logit, m0b_probit, m0b_cloglog) # cloglog clearly fits best
+
+
+m0b_logit <- add_criterion(m0b_logit,"loo")
+m0b_probit <- add_criterion(m0b_probit,"loo")
+m0b_cloglog <- add_criterion(m0b_cloglog ,"loo")
+print(loo_compare(m0b_logit, m0b_probit, m0b_cloglog, criterion="loo"), simplify = F)
+
+# pp-check -> as Y is ordinal --> ppc_bars (histogram instead of line)
+yrep_probit <- posterior_predict(m0b_probit, draws = 500) #matrix yrep of draws from the posterior predictive distribution
+yrep_cloglog <- posterior_predict(m0b_cloglog, drwas = 500)
+pp_check_bcloglog <- bayesplot::ppc_bars(dfsub$bored_post, yrep_probit) # Yrep = simulated data; Y = actual data 
+pp_check_bprobit <- bayesplot::ppc_bars(dfsub$bored_post, yrep_cloglog)
+pp_check_bcloglog # slightly nicer?
+pp_check_bprobit
+
+# chosen F distribution (Link function)
+m0b <- m0b_cloglog
+```
+
+## BOREDOM mean
+
+```{r}
+# full model including FaceReader's estimate as predictor
+m1_bmean <-  update(m0b, formula. = ~ . + mean_boredom,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)), 
+                    newdata = dfsubb,
+                    save_all_pars = T)
+
+## model parameter
+summary(m1_bmean)
+stanplot(m1_bmean)
+stanplot(m1_bmean, type = "trace") # visually inspect convergence
+
+# plots
+plot(marginal_effects(m1_bmean, "mean_boredom", categorical = T), points = T) # categorical
+
+# posterior predictive checks
+yrep_m0 <- posterior_predict(m0b, draws = 500)
+yrep_m1 <- posterior_predict(m1_bmean, draws = 500)
+ppc_m0 <- bayesplot::ppc_bars(dfsub$bored_post, yrep_m0) 
+ppc_m1_bmean <- bayesplot::ppc_bars(dfsub$bored_post, yrep_m1)
+ppc_m0
+ppc_m1_bmean # no difference visible
+
+# model comparison
+m0b <- add_criterion(m0b,"waic")
+m1_bmean <- add_criterion(m1_bmean,"waic")
+print(loo_compare(m0b, m1_bmean, criterion="waic"), simplify = F) 
+```
+
+## BOREDOM mean and SD
+```{r}
+# full model including FaceReader's estimates as predictor
+m1_bmeanxsd <-  update(m0b, formula. = ~ . + mean_boredom*sd_boredom,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                    newdata = dfsubb,
+                    save_all_pars = T)
+
+## model indicators 
+summary(m1_bmeanxsd)
+stanplot(m1_bmeanxsd)
+stanplot(m1_bmeanxsd, type = "trace") # visually inspect convergence
+
+## directed hypothesis --> evid. ratio = Post_Prob() --> not here???
+hypothesis(m1_bmeanxsd, "mean_boredom:sd_boredom > 0") # class = b
+    ##The one-sided 95% CI does not contain zero, thus indicating that the standard deviations differ from each other in the expected direction.
+    ##The Evid.Ratio shows that the hypothesis being tested (i.e., mean_boredom:sd_boredom > 0) is about 24 times more likely than the alternative hypothesis (mean_boredom:sd_boredom < 0). Values greater than one indicate that the evidence in favor of H1, P(H1/D) / P(H0/D)
+
+### additive effects only
+m1_bmeanpsd <-  update(m0b, formula. = ~ . + mean_boredom + sd_boredom,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                    newdata = dfsubb,
+                    save_all_pars = T)
+summary(m1_bmeanpsd)
+brms::post_prob(m1_bmeanxsd, m1_bmeanpsd) 
+
+# plots
+plot(marginal_effects(m1_bmeanxsd,"mean_boredom:sd_boredom", categorical = F), points = T)
+plot(marginal_effects(m1_bmeanxsd,"sd_boredom:mean_boredom", categorical = F), points = T)
+marginal_effects(m1_bmeanxsd)$'mean_boredom:sd_boredom'
+
+## effect of predictor at + 1 SD 
+
+hypothesis(m1_bmeanxsd, "mean_boredom + mean_boredom:sd_boredom * -1 = 0")
+hypothesis(m1_bmeanxsd, "mean_boredom + mean_boredom:sd_boredom * 0 = 0")
+hypothesis(m1_bmeanxsd, "mean_boredom + mean_boredom:sd_boredom * 1 = 0")
+
+ps <- posterior_samples(m1_bmeanxsd)
+ps %>% mutate(mean_predict = b_mean_boredom + `b_mean_boredom:sd_boredom` * -1) %>% summarise(mean_high = mean(mean_predict))
+
+df_int <- dfsubb %>% 
+  mutate(
+    mean_boredom_high = sd_boredom - (mean(sd_boredom) + sd(sd_boredom)),
+    mean_boredom_low = sd_boredom - (mean(sd_boredom) - sd(sd_boredom)))
+
+
+
+## plot b densities and CIs
+m1_bmeanxsd_ggs <- ggs(m1_bmeanxsd) # transforms the brms output into a longformat tibble (used to make different types of plots)
+m1_bmeanxsd_ggs
+ggplot(filter(m1_bmeanxsd_ggs, Parameter == "b_mean_boredom:sd_boredom", Iteration>1000), aes(x=value)) +
+  geom_density(fill = "orange", alpha = .5) + geom_vline(xintercept = 0, col="red", size=1) +
+  scale_x_continuous(name="Value", limits=c(-1, 2)) + 
+  labs(title="Posterior density of regression coefficient for mean of FaceReader's interest estimates") +
+  theme_apa() + 
+  geom_vline(xintercept = summary(m1_bmeanxsd)$fixed[7,3:4], col="blue", linetype=2) # 95% CrI
+
+
+# posterior predictive checks 
+Yrep_m1_bmeanxsd <- posterior_predict(m1_bmeanxsd, draws = 500)
+ppc_m1_bmeanxsd <- bayesplot::ppc_bars(dfsub$bored_post, Yrep_m1_bmeanxsd) 
+ppc_m1_bmeanxsd
+
+
+m0b <- add_criterion(m0b, criterion =  "kfold", folds = "grouped", group = "participant")
+m1_bmeanxsd <- add_criterion(m1_bmeanxsd, criterion = "kfold", folds = "grouped", group = "participant")
+print(loo_compare(m0b, m1_bmeanxsd, criterion = "kfold"), simplify = T)
+## Estimating out-of sample predictions (via 10-fold cross validation) of the interaction model, compared to a model with no predictors yielded better results for the model without the interaction. Accordingly, we consider this potential interaction effect as irrelevant. 
+```
+
+## BOREDOM mean of peaks
+```{r}
+m1_bpeak <-  update(m0b, formula. = ~ . + peak10_boredom,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                    newdata = dfsubb,
+                    save_all_pars = T)
+
+## model parameter 
+summary(m1_bpeak)
+stanplot(m1_bpeak)
+stanplot(m1_bpeak, type = "trace") # visually inspect convergence
+
+# plots
+plot(marginal_effects(m1_bpeak,"peak10_boredom", categorical = F), points = T) 
+
+# posterior predictive checks
+Yrep_m1_bpeak <- posterior_predict(m1_bpeak, draws = 500)
+ppc_m1_m1_bpeak <- bayesplot::ppc_bars(dfsub$bored_post, Yrep_m1_bpeak) 
+ppc_m1_m1_bpeak
+```
+
+## BOREDOM model comparison
+```{r}
+# loo (cross validation)
+m0b <- add_criterion(m0b, criterion = "loo")
+m1_bmean <- add_criterion(m1_bmean, criterion = "loo")
+m1_bpeak <- add_criterion(m1_bpeak, criterion = "loo") # 29 observations with a pareto_k > 0.7
+m1_bmeanxsd  <- add_criterion(m1_bmeanxsd, criterion = "loo") # 25 observations with a pareto_k > 0.7
+print(loo_compare(m0b, m1_bmean, m1_bpeak, m1_bmeanxsd, criterion = "loo"), simplify = T)
+  
+# perform 10-fold cross validation
+m0b <- add_criterion(m0b, criterion =  "kfold", folds = "grouped", group = "participant")
+m1_bmean <- add_criterion(m1_bmean, criterion = "kfold", folds = "grouped", group = "participant")
+m1_bpeak <- add_criterion(m1_bpeak, criterion = "kfold", folds = "grouped", group = "participant")
+m1_bmeanxsd <- add_criterion(m1_bmeanxsd, criterion = "kfold", folds = "grouped", group = "participant")
+print(loo_compare(m0b, m1_bmean, m1_bpeak, m1_bmeanxsd, criterion = "kfold"), simplify = T)
+```
+
+# 3. VALENCE
+## plot distributions of relevant variables
+```{r}
+#plots
+# densities of self-reported boredom
+dfsubv %>%
+    ggplot(aes(x = valence_post, y = ..density..)) +
+    facet_grid(~ text) +
+    geom_histogram() 
+
+# mean FaceReader
+dfsubv %>%
+    ggplot(aes(x = mean_valence, y = ..density..)) +
+    geom_histogram()
+
+scat(
+    data = df,
+    x = "mean_valence",
+    y = "valence_post",
+    marg = "dens",
+    line = "linear",
+    se = TRUE
+    )
+# SD of mean FaceReader
+df %>%
+    ggplot(aes(x = sd_valence, y = ..density..)) +
+    geom_histogram() # looks like binary + gaussian distribution
+
+# peaks of FaceReader
+df %>%
+    ggplot(aes(x = peak10_valence_neg, y = ..density..)) +
+    geom_histogram() # looks like binary + gaussian distribution
+df %>%
+    ggplot(aes(x = peak10_valence_pos, y = ..density..)) +
+    geom_histogram() # looks like binary + gaussian distribution
+
+scat(
+    data = df,
+    x = "peak10_valence_neg",
+    y = "valence_post",
+    marg = "dens",
+    line = "linear",
+    se = TRUE
+    )
+
+scat(
+    data = df,
+    x = "peak10_valence_pos",
+    y = "valence_post",
+    marg = "dens",
+    line = "linear",
+    se = TRUE
+    )
+
+```
+
+stronger priors for valence, as issues with convergence.
+
+## VALENCE restricted model
+```{r}
+## select complete cases of relevant variables
+dfsubv <- df %>% dplyr::select(participant, valence_post, mean_valence, sd_valence, peak10_valence_pos, peak10_valence_neg) %>% drop_na()
+
+
+# restricted model
+m0v_cloglog <- brm(
+          valence_post ~ 1 + (1|participant),
+          family = cumulative("cloglog"),
+          prior = c(prior(cauchy(0, 1), class = sd)),
+          iter = 4000, warmup = 2000, chains = 4, cores = 4,
+          control = list(adapt_delta = 0.99, max_treedepth = 15),
+          data = dfsubv,
+          inits = 0,
+          save_all_pars = T)
+
+summary(m0v_cloglog) # does not converge --> probit
+m0v_cloglog$prior
+
+## probit-model (working)
+m0v_probit <- brm(
+          valence_post ~ 1 + (1|participant),
+          family = cumulative("probit"),
+          prior = c(prior(normal(0, 1), class = Intercept), 
+                    prior(cauchy(0, 1), class = sd)),
+          iter = 4000, warmup = 2000, chains = 4, cores = 4,
+          control = list(adapt_delta = 0.99, max_treedepth = 15),
+          data = dfsubv,
+          inits = 0,
+          save_all_pars = T)
+summary(m0v_probit)
+
+# other link functions
+m0v_logit <-  update(m0v_cloglog,
+                    family = cumulative("logit"))
+
+m0v_probit <-  update(m0v_cloglog,
+                      family = cumulative("probit"))
+
+m0v_logit <- add_criterion(m0v_logit,"waic")
+m0v_probit <- add_criterion(m0v_probit,"waic")
+m0v_cloglog <- add_criterion(m0v_cloglog ,"waic")
+print(loo_compare(m0v_logit, m0v_probit, m0v_cloglog, criterion="waic"), simplify = F)  # 
+
+# pp-check -> as Y is ordinal --> ppc_bars (histogram instead of line)
+yrep_probit <- posterior_predict(m0v_probit, draws = 500) #matrix yrep of draws from the posterior predictive distribution
+yrep_cloglog <- posterior_predict(m0v_cloglog, draws = 500)
+pp_check_vcloglog <- bayesplot::ppc_bars(dfsubb$valence_post, yrep_probit) # Yrep = simulated data; Y = actual data 
+pp_check_vprobit <- bayesplot::ppc_bars(dfsubb$valence_post, yrep_cloglog)
+pp_check_vcloglog 
+pp_check_vprobit # hard to tell which one fits better
+
+# chosen F distribution (Link function)
+m0v <- m0v_probit
+```
+## VALENCE mean
+
+
+```{r}
+# full model including FaceReader's estimate as predictor
+m1_vmean <-  update(m0v, formula. = ~ . + mean_valence,
+                    prior = c(prior(normal(0, 1), class = Intercept),
+                              prior(normal(0, 1), class = b), 
+                              prior(cauchy(0, 1), class = sd)), 
+                    newdata = dfsubv,
+                    save_all_pars = T, 
+                    sample_prior = T)
+summary(m1_vmean)
+m1_vmean$prior
+## model parameter
+summary(mv_imean)
+
+
+
+# plots
+plot(marginal_effects(m1_vmean, "mean_valence", categorical = F), points = T, point_args = c(alpha = 0.8)) 
+
+plot(hypothesis(m1_vmean, "mean_valence > 0", ignore_prior = F), plot = F, theme = theme_get())[[1]] + scale_x_continuous(limits=c(-1, 1)) # sample_prior = T needed in brms fit to plot prior
+
+  
+# posterior predictive checks
+yrep_m0 <- posterior_predict(m0v, draws = 500)
+yrep_m1 <- posterior_predict(m1_vmean, draws = 500)
+ppc_m0i <- bayesplot::ppc_bars(dfsub$valence_post, yrep_m0) 
+ppc_m1_imean <- bayesplot::ppc_bars(dfsub$valence_post, yrep_m1)
+ppc_m0v
+ppc_m1_vmean 
+```
+
+
+
+## VALENCE mean and SD
+
+```{r}
+# full model including FaceReader's estimates as predictor
+m1_vmeanxsd <-  update(m0v, formula. = ~ . + mean_valence*sd_valence,
+                    prior = c(prior(normal(0, 1), class = Intercept),
+                              prior(normal(0, 1), class = b), 
+                              prior(cauchy(0, 1), class = sd)),
+                    newdata = dfsubv,
+                    save_all_pars = T,
+                    sample_prior = T)
+
+## model parameter
+summary(m1_vmeanxsd)
+stanplot(m1_vmeanxsd, type = "trace")
+stanplot(m1_vmeanxsd)
+m1_imeanxsd$prior
+
+# plots
+plot(marginal_effects(m1_vmeanxsd,"mean_valence:sd_valence"), points = T) 
+
+plot(hypothesis(m1_vmeanxsd, "mean_valence:sd_valence > 0", ignore_prior = F), plot = F, theme = theme_get())[[1]] + scale_x_continuous(limits=c(-3, 3)) # sample_prior = T needed in brms fit to plot prior
+
+
+# posterior predictive checks 
+Yrep_m1_vmeanxsd <- posterior_predict(m1_vmeanxsd, draws = 500)
+ppc_m1_vmeanxsd <- bayesplot::ppc_bars(dfsub$valence_post, Yrep_m1_vmeanxsd) 
+ppc_m1_vmeanxsd
+```
+
+
+## VALENCE mean of peaks
+
+```{r}
+m1_vpeak <-  update(m0v, formula. = ~ . + peak10_valence_neg + peak10_valence_pos,
+                    prior = c(prior(normal(0, 1), class = Intercept),
+                              prior(normal(0, 1), class = b), 
+                              prior(cauchy(0, 1), class = sd)),
+                    newdata = dfsubv,
+                    save_all_pars = T)
+
+## model parameter 
+summary(m1_vpeak)
+stanplot(m1_vpeak, type = "trace")
+stanplot(m1_vpeak)
+
+# plots
+plot(marginal_effects(m1_vpeak,"peak10_valence_neg", categorical = F), points = T) 
+plot(marginal_effects(m1_vpeak,"peak10_valence_pos", categorical = F), points = T) 
+
+# posterior predictive checks
+Yrep_m1_vpeak <- posterior_predict(m1_vpeak, draws = 500)
+ppc_m1_vpeak <- bayesplot::ppc_bars(dfsubv$valence_post, Yrep_m1_vpeak) 
+ppc_m1_vpeak
+```
+
+
+## VALENCE Model comparison
+```{r}
+# loo (cross validation)
+m0v <- add_criterion(m0v, criterion = "loo", reloo = T) 
+m1_vmean <- add_criterion(m1_vmean, criterion = "loo")
+m1_vpeak <- add_criterion(m1_vpeak, criterion = "loo", reloo = F) 
+m1_vmeanxsd  <- add_criterion(m1_vmeanxsd, criterion = "loo", reloo = T)
+print(loo_compare(m0v, m1_vmean, m1_vpeak, m1_vmeanxsd, criterion = "loo"), simplify = T)
+  
+# perform 10-fold cross validation # does not work, probably not enough data when 1/10th omitted??
+m0v <- add_criterion(m0v, criterion =  "kfold", folds = "grouped", group = "participant")
+m1_vmean <- add_criterion(m1_vmean, criterion = "kfold", folds = "grouped", group = "participant")
+m1_vpeak <- add_criterion(m1_vpeak, criterion = "kfold", folds = "grouped", group = "participant") # sometimes no samples
+m1_vmeanxsd <- add_criterion(m1_vmeanxsd, criterion = "kfold", folds = "grouped", group = "participant") # no samples????
+print(loo_compare(m0v, m1_vmean, m1_vpeak, criterion = "kfold"), simplify = T)
+```
+
+
+
+```{r}
+save.image(Face_Reader_analyses_brms.RData)
+```
+
+
+# PLOTS for paper
+## mean FaceReader
+```{r}
+# load original (unstandardized) data
+df <- read_csv("df_TEEM_final.csv")
+df <- df %>% dplyr::rename("participant" = "subject_nr", "text" = "text_pic", "valence_post" = "SAM_LIKERT_POST")
+
+# select complete cases
+dfplot <- df %>% dplyr::select(participant, valence_post, mean_valence, interested_post, mean_interest, bored_post, mean_boredom) %>% drop_na() %>% 
+  filter(mean_interest < (mean(mean_interest) + 4*sd(mean_interest)) & mean_interest > (mean(mean_interest) - 4*sd(mean_interest)))
+
+# plot effect INTEREST
+e <- dfplot %>%
+    ggplot(mapping = aes(x = mean_interest, y = interested_post)) 
+e + geom_point(alpha = 0.4)  + geom_smooth(method = lm, data = dfplot) +
+    scale_x_continuous(limits = c(-0.0001, 1)) +
+    theme_apa() + 
+    labs(x = "FaceReader's mean interest", y = "self-reported interest")
+
+
+m1_imean <-  update(m0i, formula. = ~ . + mean_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)), 
+                    newdata = dfplot,
+                    save_all_pars = T, 
+                    sample_prior = TRUE)
+
+plot(marginal_effects(m1_imean, "mean_interest", method = "fitted", categorical = F), points = T, point_args = list(width = 0.9, alpha = 0.6))
+
+ggeffects::
+
+# plot effect BOREDOM
+e <- dfplot %>%
+    ggplot(mapping = aes(x = mean_boredom, y = bored_post)) +
+    scale_x_continuous(limits = c(-0.0001, 1))
+e + geom_point(alpha = 0.4)  + geom_smooth(method = lm, data = dfplot) +
+    theme_apa() + 
+    labs(x = "FaceReader's mean boredom", y = "self-reported boredom") 
+
+# plot effect VALENCE
+e <- dfplot %>%
+    ggplot(mapping = aes(x = mean_valence, y = valence_post)) 
+e + geom_point(alpha = 0.4)  + geom_smooth(method = lm, data = dfplot) +
+    scale_x_continuous(limits = c(-1, 1)) +
+    theme_apa() + 
+    labs(x = "FaceReader's mean valence ", y = "self-reported valence") 
+
+
+# plot boxplot INTEREST
+
+ib <- dfplot %>%
+    ggplot(aes(x = as.factor(interested_post), y = mean_interest)) 
+p_interest <- ib +
+  geom_boxplot(outlier.alpha = 0) + 
+  geom_jitter(colour = 'grey', alpha = 0.5) +
+    scale_y_continuous(limits = c(-0.0001, 1)) + # <0?
+    coord_flip() +
+    theme_apa() + 
+    labs(y = "FaceReader's mean boredom ", x = "self-reported boredom") + 
+    theme(aspect.ratio = 1)
+  
+print(p_interest)
+ggsave('p_interest.png')
+
+# plot boxplot BOREDOM
+bb <- dfplot %>%
+    ggplot(mapping = aes(x = as.factor(bored_post), y = mean_boredom)) 
+p_boredom <- bb + 
+  geom_boxplot(outlier.alpha = 0) + 
+  geom_jitter(colour = 'grey', alpha = 0.5) +
+    scale_y_continuous(limits= c(-0.0001, 1)) + # <0 ?
+    coord_flip() + 
+    theme_apa() + 
+    labs(y = "FaceReader's mean boredom ", x = "self-reported boredom") + 
+    theme(aspect.ratio = 1)
+
+print(p_boredom)
+ggsave('p_boredom.png')
+
+# plot boxplot VALENCE
+
+## SAM from -3 to + 3
+dfplot$valence_post <- recode(dfplot$valence_post,'1' = "-4", '2' = "-3", '3' = "-2", '4' = "-1", '5' = "0", '6' = "1", '7'="2", '8'="3", '9'="4")
+
+vb <- dfplot %>%
+    ggplot(mapping = aes(x = factor(valence_post, levels=-4:4), y = mean_valence)) 
+
+p_valence <- vb +
+  geom_boxplot(outlier.alpha = 0) + 
+  geom_jitter(colour = 'grey', alpha = 0.5) +
+    scale_y_continuous(limits = c(-1, 1)) +
+    scale_x_discrete(breaks = c(-4, -3, -2, -1, 0, 1, 2, 3, 4), drop = F) + 
+    coord_flip() + 
+    theme_apa() + 
+    labs(y = "FaceReader's mean valence ", x = "self-reported valence") + 
+    theme(aspect.ratio = 1)
+
+print(p_valence)
+ggsave('p_valence.png')
+```
+
+# save workspace
+```{r}
+save.image("C:/Users/hifr1/Desktop/TEEM contribution/Analyses/Face_Reader_analyses_brms_official.RData")
+```
+

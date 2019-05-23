@@ -1,0 +1,75 @@
+---
+title: "Tables for Open Computer Science"
+author: "Franziska Hirt"
+date: "13 Februar 2019"
+output: 
+  pdf_document:
+   keep_tex: yes
+---
+
+
+# load packages and data
+```{r include = F}
+# tables for Latex
+library(xtable)
+library(kableExtra)
+library(knitr)
+library(tidyverse)
+
+# load data frame
+df1 <- read.csv2("Table1_Data.csv", stringsAsFactors = F)
+df2 <- read.csv2("Table2_Data.csv", stringsAsFactors = F) # no stringsAsFactors crucial for later cell_spec changes!
+
+# schnelle Variante aber vermutlich weniger Optionen
+##xtable(df1, caption='Descriptives of FaceReaders estimates (aggregated as mean and mean of peak values) and students’ self-reports', label='tab1', booktabs=TRUE)
+```
+
+Table 1:
+```{r eval=T}
+table1 <- df1 %>%
+  mutate_all(linebreak) %>%
+  kable(align=c(rep("l",5)), booktabs = T, escape = F, caption = "Descriptives of FaceReader's estimates (aggregated as mean and mean of peak values) and students' self-reports", col.names = c(" ", "Self-report after", "FaceReader mean", "FaceReader mean of peak values")) %>%
+  column_spec(2:4, width = "1.8cm") %>%
+  column_spec(1, width = "1.2cm") %>% 
+  collapse_rows(columns = 1:3, latex_hline = "full") %>%
+  footnote(general= "The table presents the mean (SD, Scale range -- higher values indicating higher intensity)",
+           title_format = c("italic"), threeparttable = T) #so that captation is wrapped 
+table1
+```
+
+
+Table 2:
+## Usually it is recommended to use column_spec before collapse_rows, especially in LaTeX, to get a desired result.
+
+# df[1,5] <- cell_spec(df[1,5], "latex", underline = T)
+#df2X[1,2] <- paste0("\\underline{", df[1,2], "}")
+
+# color specific cells (those of the null model)
+# each row has to be done seperately :(
+df2x[1, c(2,3,4)] <- cell_spec(df2x[1, c(2,3,4)], background = "#BBBBBB") 
+df2x[5, c(2,3,4)] <- cell_spec(df2x[5, c(2,3,4)], background = "#BBBBBB")
+df2x[9, c(2,3,4)] <- cell_spec(df2x[9, c(2,3,4)], background = "#BBBBBB")
+
+  #row_spec(1, background = "#BBBBBB")%>% 
+  #row_spec(6, background = "#BBBBBB")%>% 
+  #row_spec(11, background = "#BBBBBB")%>%
+
+```{r eval=T}
+tthhzggfedee# rotate first column (named "x")
+df2x <- df2 %>% mutate(x = text_spec(x, "latex", angle = 90)) #, align = "c"
+
+
+# build table  
+table2 <- df2x %>%
+  kable(align=c("c", rep("l",5)), escape = F, booktabs = T, caption = "Overview of the regression coefficients", col.names = c(" ", "Model with aggregation method for FaceReader's estimates", "Regression coefficient", "Credible interval", "Number of observations")) %>%
+  column_spec(1, width="0.8cm") %>% # background = "white" not working in latex
+  column_spec(2, width="6.5cm") %>%
+  column_spec(3, width="4.5cm") %>%
+  column_spec(4, width="3cm") %>%
+  column_spec(5, width="1.4cm") %>%
+  collapse_rows(columns = c(1,2,5), valign = "middle", latex_hline = "full") %>%
+  kable_styling(full_width = T, protect_latex = T) %>% # LaTeX code between dollar protected from HTML escaping
+  footnote(general="Coefficients are based on standardized predictors (FaceReader), but unstandardized outcomes (self-reports). Some missing self-reports reduced the sample size of specific analyses.",
+           title_format = c("italic"), threeparttable = T) # threeparttable for layout included (! does not work with full_width = T, unless longtable = T, but longtable not possible in two column layout)
+table2
+```

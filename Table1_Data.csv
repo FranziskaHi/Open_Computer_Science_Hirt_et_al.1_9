@@ -1,0 +1,5 @@
+;Self-report after;FaceReader mean;FaceReader mean of peak values
+Interest;" 3.80 \newline (0.93; 1-5)";"0.01 \newline (0.04; 0-1)";"0.03 \newline (0.08; 0-1)"
+Boredom;"1.44 \newline (0.79; 1-5)";"0.06 \newline (0.15; 0-1)";"0.32 \newline (0.28; 0-1)"
+Valence;"6.94 \newline (1.13; 1-5)";"-0.12 \newline (0.15; 0-5)";pos: 0.14 \newline (0.18, 0 -1)
+Valence;"6.94 \newline (1.13; 1-5)";"-0.12 \newline (0.15; 0-5)";neg: -0.28 \newline (0.21, -1-0)
