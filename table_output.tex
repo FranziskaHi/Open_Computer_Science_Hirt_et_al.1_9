@@ -24,7 +24,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{hyperref}
 \hypersetup{unicode=true,
-            pdftitle={Tables for Open Computer Science},
+            pdftitle={Tables for Open Computer Science paper},
             pdfauthor={Franziska Hirt},
             pdfborder={0 0 0},
             breaklinks=true}
@@ -114,7 +114,7 @@
 
 \setlength{\droptitle}{-2em}
 
-  \title{Tables for Open Computer Science}
+  \title{Tables for Open Computer Science paper}
     \pretitle{\vspace{\droptitle}\centering\huge}
   \posttitle{\par}
     \author{Franziska Hirt}
@@ -142,9 +142,10 @@
 \begin{document}
 \maketitle
 
-\section{load packages and data}\label{load-packages-and-data}
+\section{Load packages and data}\label{load-packages-and-data}
 
-Table 1:
+\section{Code to generate latex code for table
+1:}\label{code-to-generate-latex-code-for-table-1}
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -169,7 +170,7 @@ Table 1:
 \toprule
   & Self-report after & FaceReader mean & FaceReader mean of peak values\\
 \midrule
-Interest & 3.8 \newline (0.93; 1-5) & 0.01 \newline (0.04; 0-1) & 0.03 \newline (0.08; 0-1)\\
+Interest & 3.80 \newline (0.93; 1-5) & 0.01 \newline (0.04; 0-1) & 0.03 \newline (0.08; 0-1)\\
 \cmidrule{1-4}
 Boredom & 1.44 \newline (0.79; 1-5) & 0.06 \newline (0.15; 0-1) & 0.32 \newline (0.28; 0-1)\\
 \cmidrule{1-4}
@@ -185,32 +186,8 @@ Boredom & 1.44 \newline (0.79; 1-5) & 0.06 \newline (0.15; 0-1) & 0.32 \newline 
 \end{threeparttable}
 \end{table}
 
-Table 2: \#\# Usually it is recommended to use column\_spec before
-collapse\_rows, especially in LaTeX, to get a desired result.
-
-\section{\texorpdfstring{df{[}1,5{]} \textless{}-
-cell\_spec(df{[}1,5{]}, ``latex'', underline =
-T)}{df{[}1,5{]} \textless{}- cell\_spec(df{[}1,5{]}, latex, underline = T)}}\label{df15---cell_specdf15-latex-underline-t}
-
-\section{\texorpdfstring{df2X{[}1,2{]} \textless{}-
-paste0(``\textbackslash{}underline\{'', df{[}1,2{]},
-``\}'')}{df2X{[}1,2{]} \textless{}- paste0(\textbackslash{}underline\{, df{[}1,2{]}, \})}}\label{df2x12---paste0underline-df12}
-
-\section{color specific cells (those of the null
-model)}\label{color-specific-cells-those-of-the-null-model}
-
-\section{each row has to be done seperately
-:(}\label{each-row-has-to-be-done-seperately}
-
-df2x{[}1, c(2,3,4){]} \textless{}- cell\_spec(df2x{[}1, c(2,3,4){]},
-background = ``\#BBBBBB'') df2x{[}5, c(2,3,4){]} \textless{}-
-cell\_spec(df2x{[}5, c(2,3,4){]}, background = ``\#BBBBBB'') df2x{[}9,
-c(2,3,4){]} \textless{}- cell\_spec(df2x{[}9, c(2,3,4){]}, background =
-``\#BBBBBB'')
-
-\#row\_spec(1, background = ``\#BBBBBB'')\%\textgreater{}\%
-\#row\_spec(6, background = ``\#BBBBBB'')\%\textgreater{}\%
-\#row\_spec(11, background = ``\#BBBBBB'')\%\textgreater{}\%
+\section{Code to generate latex code for table
+2:}\label{code-to-generate-latex-code-for-table-2}
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -220,16 +197,16 @@ c(2,3,4){]} \textless{}- cell\_spec(df2x{[}9, c(2,3,4){]}, background =
 
 \CommentTok{# build table  }
 \NormalTok{table2 <-}\StringTok{ }\NormalTok{df2x }\OperatorTok{%>%}
-\StringTok{  }\KeywordTok{kable}\NormalTok{(}\DataTypeTok{align=}\KeywordTok{c}\NormalTok{(}\StringTok{"c"}\NormalTok{, }\KeywordTok{rep}\NormalTok{(}\StringTok{"l"}\NormalTok{,}\DecValTok{5}\NormalTok{)), }\DataTypeTok{escape =}\NormalTok{ F, }\DataTypeTok{booktabs =}\NormalTok{ T, }\DataTypeTok{caption =} \StringTok{"Overview of the regression coefficients"}\NormalTok{, }\DataTypeTok{col.names =} \KeywordTok{c}\NormalTok{(}\StringTok{" "}\NormalTok{, }\StringTok{"Model with aggregation method for FaceReader's estimates"}\NormalTok{, }\StringTok{"Regression coefficient and its standard error"}\NormalTok{, }\StringTok{"Credible interval"}\NormalTok{, }\StringTok{"Number of observations"}\NormalTok{)) }\OperatorTok{%>%}
-\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DataTypeTok{width=}\StringTok{"0.8cm"}\NormalTok{) }\OperatorTok{%>%}\StringTok{ }\CommentTok{# background = "white" not working in latex}
-\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{2}\NormalTok{, }\DataTypeTok{width=}\StringTok{"6.5cm"}\NormalTok{) }\OperatorTok{%>%}
-\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{3}\NormalTok{, }\DataTypeTok{width=}\StringTok{"4.5cm"}\NormalTok{) }\OperatorTok{%>%}
-\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{4}\NormalTok{, }\DataTypeTok{width=}\StringTok{"3cm"}\NormalTok{) }\OperatorTok{%>%}
-\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{5}\NormalTok{, }\DataTypeTok{width=}\StringTok{"1.4cm"}\NormalTok{) }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{kable}\NormalTok{(}\DataTypeTok{align=}\KeywordTok{c}\NormalTok{(}\StringTok{"c"}\NormalTok{, }\KeywordTok{rep}\NormalTok{(}\StringTok{"l"}\NormalTok{,}\DecValTok{5}\NormalTok{)), }\DataTypeTok{escape =}\NormalTok{ F, }\DataTypeTok{booktabs =}\NormalTok{ T, }\DataTypeTok{caption =} \StringTok{"Overview of the regression coefficients"}\NormalTok{, }\DataTypeTok{col.names =} \KeywordTok{c}\NormalTok{(}\StringTok{" "}\NormalTok{, }\StringTok{"Model with aggregation method for FaceReader's estimates"}\NormalTok{, }\StringTok{"Regression coefficient"}\NormalTok{, }\StringTok{"Credible interval"}\NormalTok{, }\StringTok{"Number of observations"}\NormalTok{)) }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DataTypeTok{width=}\StringTok{"0.8cm"}\NormalTok{) }\OperatorTok{%>%}\StringTok{ }
+\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{2}\NormalTok{, }\DataTypeTok{width=}\StringTok{"7.0cm"}\NormalTok{) }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{3}\NormalTok{, }\DataTypeTok{width=}\StringTok{"3.0cm"}\NormalTok{) }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{4}\NormalTok{, }\DataTypeTok{width=}\StringTok{"2.5cm"}\NormalTok{) }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{5}\NormalTok{, }\DataTypeTok{width=}\StringTok{"1.8cm"}\NormalTok{) }\OperatorTok{%>%}
 \StringTok{  }\KeywordTok{collapse_rows}\NormalTok{(}\DataTypeTok{columns =} \KeywordTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{,}\DecValTok{2}\NormalTok{,}\DecValTok{5}\NormalTok{), }\DataTypeTok{valign =} \StringTok{"middle"}\NormalTok{, }\DataTypeTok{latex_hline =} \StringTok{"full"}\NormalTok{) }\OperatorTok{%>%}
 \StringTok{  }\KeywordTok{kable_styling}\NormalTok{(}\DataTypeTok{full_width =}\NormalTok{ F, }\DataTypeTok{protect_latex =}\NormalTok{ T) }\OperatorTok{%>%}\StringTok{ }\CommentTok{# LaTeX code between dollar protected from HTML escaping}
 \StringTok{  }\KeywordTok{footnote}\NormalTok{(}\DataTypeTok{general=}\StringTok{"Coefficients are based on standardized predictors (FaceReader), but unstandardized outcomes (self-reports). Some missing self-reports reduced the sample size of specific analyses."}\NormalTok{,}
-           \DataTypeTok{title_format =} \KeywordTok{c}\NormalTok{(}\StringTok{"italic"}\NormalTok{), }\DataTypeTok{threeparttable =}\NormalTok{ T) }\CommentTok{# threeparttable for layout included (! does not work with full_width = T, unless longtable = T, but longtable not possible in two column layout)}
+           \DataTypeTok{title_format =} \KeywordTok{c}\NormalTok{(}\StringTok{"italic"}\NormalTok{), }\DataTypeTok{threeparttable =}\NormalTok{ T) }
 \NormalTok{table2}
 \end{Highlighting}
 \end{Shaded}
@@ -239,41 +216,41 @@ c(2,3,4){]} \textless{}- cell\_spec(df2x{[}9, c(2,3,4){]}, background =
 \caption{\label{tab:unnamed-chunk-3}Overview of the regression coefficients}
 \centering
 \begin{threeparttable}
-\begin{tabular}{>{\centering\arraybackslash}p{0.8cm}>{\raggedright\arraybackslash}p{6.5cm}>{\raggedright\arraybackslash}p{4.5cm}>{\raggedright\arraybackslash}p{3cm}>{\raggedright\arraybackslash}p{1.4cm}}
+\begin{tabular}{>{\centering\arraybackslash}p{0.8cm}>{\raggedright\arraybackslash}p{7.0cm}>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{1.8cm}}
 \toprule
-  & Model with aggregation method for FaceReader's estimates & Regression coefficient and its standard error & Credible interval & Number of observations\\
+  & Model with aggregation method for FaceReader's estimates & Regression coefficient & Credible interval & Number of observations\\
 \midrule
- & mean as predictor & $\textit{b}  = -0.17, \textit{SE}  = 0.28$ & CrI = [-0.71, 0.38] & \\
+ & mean as predictor & \textit{b}  = -0.17 & CrI = [-0.71, 0.38] & \\
 \cmidrule{2-4}
- &  & $\textit{b\_mean*sd}  = -0.05 , \textit{SE}  = 0.30$ & CrI = [-0.60 ,  0.58] & \\
+ &  & \textit{b\_mean*sd}  = -0.05 & CrI = [-0.60 ,  0.58] & \\
 \cmidrule{3-4}
- &  & $\textit{b\_mean}  = -0.35 , \textit{SE}  = 1.00$ & CrI = [-2.38,  1.59] & \\
+ &  & \textit{b\_mean}  = -0.35 & CrI = [-2.38,  1.59] & \\
 \cmidrule{3-4}
- & \multirow{-3}{6.5cm}{\raggedright\arraybackslash interaction of mean and SD of mean as predictor} & $\textit{b\_sd}  = 0.21, \textit{SE}  = 0.34$ & CrI = [-0.44, 0.88] & \\
+ & \multirow{-3}{7.0cm}{\raggedright\arraybackslash interaction of mean and SD of mean as predictor} & \textit{b\_sd}  = 0.21 & CrI = [-0.44, 0.88] & \\
 \cmidrule{2-4}
-\multirow{-5}{0.8cm}{\centering\arraybackslash \rotatebox{90}{Interest}} & mean over the 10\% of the highest values as predictor & $\textit{b}  = -0.07, \textit{SE}  = 0.19$ & CrI = [-0.44, 0.29] & \multirow{-5}{1.4cm}{\raggedright\arraybackslash \textit{obs} = 203}\\
+\multirow{-5}{0.8cm}{\centering\arraybackslash \rotatebox{90}{Interest}} & mean over the 10\% of the highest values as predictor & \textit{b}  = -0.07 & CrI = [-0.44, 0.29] & \multirow{-5}{1.8cm}{\raggedright\arraybackslash \textit{obs} = 203}\\
 \cmidrule{1-5}
- & mean as predictor & $\textit{b}  = -0.10, \textit{SE}  = 0.18$ & CrI = [-0.47, 0.23] & \\
+ & mean as predictor & \textit{b}  = -0.10 & CrI = [-0.47, 0.23] & \\
 \cmidrule{2-4}
- &  & $\textit{b\_mean*sd}  = 0.38, \textit{SE}  = 0.24$ & CrI = [-0.03, 0.90] & \\
+ &  & \textit{b\_mean*sd}  = 0.38 & CrI = [-0.03, 0.90] & \\
 \cmidrule{3-4}
- &  & \textit{b\_mean} = -0.25, \textit{SE}  = 0.35 & CrI = [-1.02, 0.35] & \\
+ &  & \textit{b\_mean} = -0.25 & CrI = [-1.02, 0.35] & \\
 \cmidrule{3-4}
- & \multirow{-3}{6.5cm}{\raggedright\arraybackslash interaction of mean and SD of mean as predictor} & $\textit{b\_sd}  = -0.03, \textit{SE}  = 0.30$ & CrI = [-0.61, 0.58] & \\
+ & \multirow{-3}{7.0cm}{\raggedright\arraybackslash interaction of mean and SD of mean as predictor} & \textit{b\_sd}  = -0.03 & CrI = [-0.61, 0.58] & \\
 \cmidrule{2-4}
-\multirow{-5}{0.8cm}{\centering\arraybackslash \rotatebox{90}{Boredom}} & mean over the 10\% of the highest values as predictor & $\textit{b}  = -0.16, \textit{SE}  = 0.18$ & CrI = [-0.53, 0.16 ] & \multirow{-5}{1.4cm}{\raggedright\arraybackslash \textit{obs} = 204}\\
+\multirow{-5}{0.8cm}{\centering\arraybackslash \rotatebox{90}{Boredom}} & mean over the 10\% of the highest values as predictor & \textit{b}  = -0.16 & CrI = [-0.53, 0.16] & \multirow{-5}{1.8cm}{\raggedright\arraybackslash \textit{obs} = 204}\\
 \cmidrule{1-5}
- & mean as predictor & $\textit{b}  = -0.01, \textit{SE}  = 0.15$ & CrI = [-0.30, 0.28] & \\
+ & mean as predictor & \textit{b}  = -0.01 & CrI = [-0.30, 0.28] & \\
 \cmidrule{2-4}
- &  & $\textit{b\_mean*sd}  = -0.13, \textit{SE}  = 0.15$ & CrI = [-0.43, 0.16] & \\
+ &  & \textit{b\_mean*sd}  = -0.13 & CrI = [-0.43, 0.16] & \\
 \cmidrule{3-4}
- &  & $\textit{b\_mean}  = 0.16, \textit{SE}  = 0.24$ & CrI = [-0.31, 0.63] & \\
+ &  & \textit{b\_mean}  = 0.16 & CrI = [-0.31, 0.63] & \\
 \cmidrule{3-4}
- & \multirow{-3}{6.5cm}{\raggedright\arraybackslash interaction of mean and SD of mean as predictor} & $\textit{b\_sd}  = 0.03, \textit{SE}  = 0.14$ & CrI = [-0.23, 0.30] & \\
+ & \multirow{-3}{7.0cm}{\raggedright\arraybackslash interaction of mean and SD of mean as predictor} & \textit{b\_sd}  = 0.03 & CrI = [-0.23, 0.30] & \\
 \cmidrule{2-4}
- &  & $\textit{b\_pos}  = 0.04, \textit{SE}  = 0.12$ & CrI = [-0.20, 0.28] & \\
+ &  & \textit{b\_pos}  = 0.04 & CrI = [-0.20, 0.28] & \\
 \cmidrule{3-4}
-\multirow{-6}{0.8cm}{\centering\arraybackslash \rotatebox{90}{Valence}} & \multirow{-2}{6.5cm}{\raggedright\arraybackslash mean over the 10\% of the most extreme positive and  negative values as two separate predictors} & $\textit{b\_neg}  = -0.05, \textit{SE}  = 0.14$ & CrI = [-0.32, 0.23] & \multirow{-6}{1.4cm}{\raggedright\arraybackslash \textit{obs} = 193}\\
+\multirow{-6}{0.8cm}{\centering\arraybackslash \rotatebox{90}{Valence}} & \multirow{-2}{7.0cm}{\raggedright\arraybackslash mean over the 10\% of the most extreme positive and  negative values as two separate predictors} & \textit{b\_neg}  = -0.05 & CrI = [-0.32, 0.23] & \multirow{-6}{1.8cm}{\raggedright\arraybackslash \textit{obs} = 193}\\
 \bottomrule
 \end{tabular}
 \begin{tablenotes}

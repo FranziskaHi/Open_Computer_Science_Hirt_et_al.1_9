@@ -1,17 +1,17 @@
-x;Model with aggregation method for FaceReader’s estimates;Regression coefficient;Credible interval;Number of \n observations
-Interest;mean as predictor;$\textit{b}  = -0.17, \textit{SD}  = 0.28$;CrI = [-0.71, 0.38];\textit{obs} = 203
-Interest;interaction of mean and SD of mean as predictor;$\textit{b\_mean*sd}  = -0.05 , \textit{SD}  = 0.30$;CrI = [-0.60 ,  0.58];\textit{obs} = 203
-Interest;interaction of mean and SD of mean as predictor;$\textit{b\_mean}  = -0.35 , \textit{SD}  = 1.00$;CrI = [-2.38,  1.59];\textit{obs} = 203
-Interest;interaction of mean and SD of mean as predictor;$\textit{b\_sd}  = 0.21, \textit{SD}  = 0.34$;CrI = [-0.44, 0.88];\textit{obs} = 203
-Interest;mean over the 10\% of the highest values as predictor;$\textit{b}  = -0.07, \textit{SD}  = 0.19$;CrI = [-0.44, 0.29];\textit{obs} = 203
-Boredom;mean as predictor;$\textit{b}  = -0.10, \textit{SD}  = 0.18$;CrI = [-0.47, 0.23];\textit{obs} = 204
-Boredom;interaction of mean and SD of mean as predictor;$\textit{b\_mean*sd}  = 0.38, \textit{SD}  = 0.24$;CrI = [-0.03, 0.90];\textit{obs} = 204
-Boredom;interaction of mean and SD of mean as predictor;\textit{b\_mean} = -0.25, \textit{SD}  = 0.35;CrI = [-1.02, 0.35];\textit{obs} = 204
-Boredom;interaction of mean and SD of mean as predictor;$\textit{b\_sd}  = -0.03, \textit{SD}  = 0.30$;CrI = [-0.61, 0.58];\textit{obs} = 204
-Boredom;mean over the 10\% of the highest values as predictor;$\textit{b}  = -0.16, \textit{SD}  = 0.18$;CrI = [-0.53, 0.16 ];\textit{obs} = 204
-Valence;mean as predictor;$\textit{b}  = -0.01, \textit{SD}  = 0.15$;CrI = [-0.30, 0.28];\textit{obs} = 193
-Valence;interaction of mean and SD of mean as predictor;$\textit{b\_mean*sd}  = -0.13, \textit{SD}  = 0.15$;CrI = [-0.43, 0.16];\textit{obs} = 193
-Valence;interaction of mean and SD of mean as predictor;$\textit{b\_mean}  = 0.16, \textit{SD}  = 0.24$;CrI = [-0.31, 0.63];\textit{obs} = 193
-Valence;interaction of mean and SD of mean as predictor;$\textit{b\_sd}  = 0.03, \textit{SD}  = 0.14$;CrI = [-0.23, 0.30];\textit{obs} = 193
-Valence;mean over the 10\% of the most extreme positive and  negative values as two separate predictors;$\textit{b\_pos}  = 0.04, \textit{SD}  = 0.12$;CrI = [-0.20, 0.28];\textit{obs} = 193
-Valence;mean over the 10\% of the most extreme positive and  negative values as two separate predictors;$\textit{b\_neg}  = -0.05, \textit{SD}  = 0.14$;CrI = [-0.32, 0.23];\textit{obs} = 193
+x;Model with aggregation method for FaceReader’s estimates;Regression coefficient;Credible interval;Number of observations
+Interest;mean as predictor;\textit{b}  = -0.17;CrI = [-0.71, 0.38];\textit{obs} = 203
+Interest;interaction of mean and SD of mean as predictor;\textit{b\_mean*sd}  = -0.05;CrI = [-0.60 ,  0.58];\textit{obs} = 203
+Interest;interaction of mean and SD of mean as predictor;\textit{b\_mean}  = -0.35;CrI = [-2.38,  1.59];\textit{obs} = 203
+Interest;interaction of mean and SD of mean as predictor;\textit{b\_sd}  = 0.21;CrI = [-0.44, 0.88];\textit{obs} = 203
+Interest;mean over the 10\% of the highest values as predictor;\textit{b}  = -0.07;CrI = [-0.44, 0.29];\textit{obs} = 203
+Boredom;mean as predictor;\textit{b}  = -0.10;CrI = [-0.47, 0.23];\textit{obs} = 204
+Boredom;interaction of mean and SD of mean as predictor;\textit{b\_mean*sd}  = 0.38;CrI = [-0.03, 0.90];\textit{obs} = 204
+Boredom;interaction of mean and SD of mean as predictor;\textit{b\_mean} = -0.25;CrI = [-1.02, 0.35];\textit{obs} = 204
+Boredom;interaction of mean and SD of mean as predictor;\textit{b\_sd}  = -0.03;CrI = [-0.61, 0.58];\textit{obs} = 204
+Boredom;mean over the 10\% of the highest values as predictor;\textit{b}  = -0.16;CrI = [-0.53, 0.16];\textit{obs} = 204
+Valence;mean as predictor;\textit{b}  = -0.01;CrI = [-0.30, 0.28];\textit{obs} = 193
+Valence;interaction of mean and SD of mean as predictor;\textit{b\_mean*sd}  = -0.13;CrI = [-0.43, 0.16];\textit{obs} = 193
+Valence;interaction of mean and SD of mean as predictor;\textit{b\_mean}  = 0.16;CrI = [-0.31, 0.63];\textit{obs} = 193
+Valence;interaction of mean and SD of mean as predictor;\textit{b\_sd}  = 0.03;CrI = [-0.23, 0.30];\textit{obs} = 193
+Valence;mean over the 10\% of the most extreme positive and  negative values as two separate predictors;\textit{b\_pos}  = 0.04;CrI = [-0.20, 0.28];\textit{obs} = 193
+Valence;mean over the 10\% of the most extreme positive and  negative values as two separate predictors;\textit{b\_neg}  = -0.05;CrI = [-0.32, 0.23];\textit{obs} = 193

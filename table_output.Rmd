@@ -1,5 +1,5 @@
 ---
-title: "Tables for Open Computer Science"
+title: "Tables for Open Computer Science paper"
 author: "Franziska Hirt"
 date: "13 Februar 2019"
 output: 
@@ -42,12 +42,12 @@ df2x <- df2 %>% mutate(x = text_spec(x, "latex", angle = 90)) #, align = "c"
 
 # build table  
 table2 <- df2x %>%
-  kable(align=c("c", rep("l",5)), escape = F, booktabs = T, caption = "Overview of the regression coefficients", col.names = c(" ", "Model with aggregation method for FaceReader's estimates", "Regression coefficient", "Credible interval", "Number of observations")) %>%
+  kable(align=c("c", rep("l",5)), escape = F, booktabs = T, caption = "Overview of the regression coefficients of the Bayesian Generalized Linear Mixed-Models", col.names = c(" ", "Model with aggregation method for FaceReader's estimates", "Regression coefficient", "Credible interval", "Number of observations")) %>%
   column_spec(1, width="0.8cm") %>% 
-  column_spec(2, width="6.5cm") %>%
-  column_spec(3, width="4.5cm") %>%
-  column_spec(4, width="3cm") %>%
-  column_spec(5, width="1.4cm") %>%
+  column_spec(2, width="7.0cm") %>%
+  column_spec(3, width="3.0cm") %>%
+  column_spec(4, width="2.5cm") %>%
+  column_spec(5, width="1.8cm") %>%
   collapse_rows(columns = c(1,2,5), valign = "middle", latex_hline = "full") %>%
   kable_styling(full_width = F, protect_latex = T) %>% # LaTeX code between dollar protected from HTML escaping
   footnote(general="Coefficients are based on standardized predictors (FaceReader), but unstandardized outcomes (self-reports). Some missing self-reports reduced the sample size of specific analyses.",
