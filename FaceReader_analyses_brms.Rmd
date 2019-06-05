@@ -1,0 +1,420 @@
+---
+title: 'Analyses for the paper: Measuring emotions during learning'
+author: "Franziska Hirt"
+date: "23 Mai 2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = T, warning = F, message = F)
+```
+
+---
+title: "R Notebook"
+author: "Franziska Hirt"
+output:
+  pdf_document: default
+---
+
+# PREPARATIONS
+```{r}
+# load packages
+library(tidyverse)
+library(stats)
+library(scatr)
+library(jmv)
+library(rstan)
+library(brms)
+library(bayesplot)
+library(ggmcmc) # for ggs posterior plot
+library(ggthemes)
+library(papaja)
+
+# set ggplot theme
+theme_set(theme_default())
+
+# set rstan options
+rstan::rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+## Selection of statistical methods
+- Bayesian statistics as more intuitive to interprete
+
+- Mixed models, because events (level 1) nested within subjects (level 2). But only random intercepts included, as random effects when only two rows per participant are hardly identifyable.
+
+- Treat emotional self-reports as ordinal outcome variables including edge effects in the data (i.e. many data points in the highest/lowest category). Cummulative family as we understand the Likert-scales as the categorization of a latent continuous construct (cf. Bürkner & Vuorre, 2019)
+
+- Assummption of equal variances: "If unequal variances are theoretically possible -- and they usually are -- we also recommend incorporating them into the model" (Burkner & Vuorre, 2019). However, models allowing for unequal variances did not converge and were therefore omitted.
+
+- Not controlling for the effect of the specific texts as not enough levels (6) for random effects and when introduced as level 2 predictor, too conservative (the effect of the emotional differences between the texts would be removed).
+
+### Choosing link family:
+link-distributions (usually only minor impact on results):
+logit = logistic,
+probit = gaussian,
+cloglog = extreme value distribution
+http://bayesium.com/which-link-function-logit-probit-or-cloglog/
+
+The choice should be made based on some combination of:
+- Knowledge of the response distribution,
+- Theoretical considerations, and
+- Empirical fit to the data.
+https://stats.stackexchange.com/questions/20523/difference-between-logit-and-probit-models
+
+### interpretation of summary of fitted model
+- Estimate is the mean of the posterior distribution, and corresponds to the frequentist point estimate
+- Est.Error is the standard deviation of the posterior distribution
+- thresholds in ordinal models are called "intercepts"
+marginal effects for ordinal models: https://github.com/paul-buerkner/brms/issues/190
+
+### posterior predictive checks
+for ordinal models pp_check not adequate: https://github.com/stan-dev/bayesplot/issues/73
+ppc: https://mc-stan.org/bayesplot/articles/graphical-ppcs.html
+
+## load data
+```{r }
+# load data
+df <- read_csv("df_TEEM_final.csv")
+
+# rename some variables
+df <- df %>% dplyr::rename("participant" = "subject_nr", "text" = "text_pic", "valence_post" = "SAM_LIKERT_POST")
+```
+
+
+## standardize predictors (helps for model convergence and for the interpretation of the interaction effects)
+```{r}
+df <- df %>% 
+  mutate(
+    mean_interest = scale(mean_interest, center = T, scale = T),
+    mean_boredom = scale(mean_boredom, center = T, scale = T),
+    mean_valence = scale(mean_valence, center = T), scale = T)
+
+df <- df %>% 
+  mutate(
+    sd_interest = scale(sd_interest, center = T, scale = T),
+    sd_boredom = scale(sd_boredom, center = T, scale = T),
+    sd_valence = scale(sd_valence, center = T), scale = T)
+
+df <- df %>% 
+  mutate(
+    peak10_interest = scale(peak10_interest, center = T, scale = T),
+    peak10_boredom = scale(peak10_boredom, center = T, scale = T),
+    peak10_valence_pos = scale(peak10_valence_pos, center = T, scale = T),
+    peak10_valence_neg = scale(peak10_valence_neg), center = T, scale = T)
+```
+
+
+# 1. INTEREST
+## INTEREST restricted model
+```{r}
+# complete cases only (drop NAs)
+dfsub <- df %>% dplyr::select(participant, interested_post, mean_interest, sd_interest, peak10_interest) %>% drop_na()
+
+# restricted model
+m0i_cloglog <- brm(
+          interested_post ~ 1 + (1|participant),
+          family = cumulative("cloglog"),                    
+          prior = prior(cauchy(0, 10), class = sd), 
+          iter = 4000, warmup = 2000, chains = 4, cores = 4,
+          inits = 0,
+          data = dfsub,
+          save_all_pars = T) # needed for bayes factor later on
+
+summary(m0i_cloglog)
+
+# other link functions
+m0i_logit <-  update(m0i_cloglog,
+                    family = cumulative("logit"))
+
+m0i_probit <-  update(m0i_cloglog,
+                      family = cumulative("probit"))
+# compare different link functions using assimilation of leave-one-out-cross validation (looic)
+m0i_logit <- add_criterion(m0i_logit,"loo")
+m0i_probit <- add_criterion(m0i_probit,"loo", reloo = TRUE) #"reloo = TRUE" actually calculates MCMC for problematic observations 
+m0i_cloglog <- add_criterion(m0i_cloglog ,"loo", reloo = TRUE)
+print(loo_compare(m0i_logit, m0i_probit, m0i_cloglog, criterion="loo"), simplify = F)  # cloglog 1.5-3.5 SD better
+
+# chosen F distribution (Link function), final Null-Modell
+m0i <- m0i_cloglog
+```
+
+## INTEREST mean
+```{r}
+# full model including FaceReader's estimate as predictor
+m1_imean <-  update(m0i, formula. = ~ . + mean_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)), 
+                    newdata = dfsub,
+                    save_all_pars = T, 
+                    sample_prior = TRUE)
+
+## model parameter
+summary(m1_imean)
+
+# plots
+plot(marginal_effects(m1_imean, "mean_interest", method = "fitted", categorical = F), points = T) # shows the strong influence of two obervations
+  
+# Model without "outliers"
+dfsub_out <- dfsub %>% 
+  filter(mean_interest < (mean(mean_interest) + 4*sd(mean_interest)) & mean_interest > (mean(mean_interest) - 4*sd(mean_interest))) 
+dfsub_out # two observations less
+
+dfsub %>% filter(mean_interest > (mean(mean_interest) + 4*sd(mean_interest)) | mean_interest < (mean(mean_interest) - 4*sd(mean_interest))) # ouliers are from one participant (highly expressive in video)
+
+
+m1_imean_out <-  update(m0i, formula. = ~ . + mean_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)), 
+                    newdata = dfsub_out,
+                    save_all_pars = T, 
+                    sample_prior = TRUE)
+summary(m1_imean_out)
+
+## plots    
+plot(marginal_effects(m1_imean_out, "mean_interest", method = "fitted", categorical = F), points = T)
+
+# chose final model
+m1_imean <- m1_imean_out
+```
+
+
+
+## INTEREST SD * mean
+```{r}
+# the participant from before also outlier in SD? --> No! --> leave it in
+dfsub_out %>% filter(sd_interest > (mean(sd_interest) + 4*sd(sd_interest)) | sd_interest < (mean(sd_interest) - 4*sd(mean_interest))) # ouliers are from one participant (highly expressive in video)
+
+
+# full model including FaceReader's estimates as predictor
+m1_imeanxsd <-  update(m0i, formula. = ~ . + mean_interest*sd_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                    control = list(adapt_delta = 0.99),
+                    newdata = dfsub_out, # without outliers of mean interest
+                    save_all_pars = T)
+
+## model indicator
+summary(m1_imeanxsd)
+
+# plots
+plot(marginal_effects(m1_imeanxsd,"mean_interest:sd_interest"), points = T, point_args = list(width = 0.9, alpha = 0.6)) 
+plot(marginal_effects(m1_imeanxsd,"mean_interest"), points = T, point_args = list(width = 0.9, alpha = 0.6)) 
+plot(marginal_effects(m1_imeanxsd,"sd_interest"), points = T, point_args = list(width = 0.9, alpha = 0.6)) 
+```
+
+## INTEREST mean of peaks
+```{r}
+#remove outliers from mean also in peak:
+dfsub_outpeak <- dfsub %>% filter(peak10_interest < (mean(peak10_interest) + 4*sd(peak10_interest)) & peak10_interest > (mean(peak10_interest) - 4*sd(peak10_interest))) 
+dfsub_outpeak
+
+dfsub %>% filter(peak10_interest > (mean(peak10_interest) + 4*sd(peak10_interest)) | peak10_interest < (mean(peak10_interest) - 4*sd(peak10_interest)))  # 2 ouliers are from the same participant as before
+
+# model including outliers
+m1_ipeak <- update(m0i, formula. = ~ . + peak10_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                              newdata = dfsub,
+                              save_all_pars = T)
+summary(m1_ipeak)
+
+# model without outliers
+m1_ipeak_out <- update(m0i, formula. = ~ . + peak10_interest,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                              newdata = dfsub_outpeak,
+                              control = list(adapt_delta = 0.99),
+                              save_all_pars = T)
+
+## model parameter 
+summary(m1_ipeak_out)
+
+# plots
+plot(marginal_effects(m1_ipeak,"peak10_interest", categorical = F), points = T) 
+plot(marginal_effects(m1_ipeak_out,"peak10_interest", categorical = F), points = T)
+
+m1_peak <- m1_ipeak_out
+```
+
+# 2. BOREDOM
+## BOREDOM restricted model
+
+```{r}
+# complete cases only (drop NAs)
+dfsubb <- df %>% dplyr::select(participant, bored_post, mean_boredom, sd_boredom, peak10_boredom) %>% drop_na()
+
+# restricted model
+m0b_cloglog <- brm(
+          bored_post ~ 1 + (1|participant),
+          family = cumulative("cloglog"),
+          prior = prior(cauchy(0, 10), class = sd),
+          iter = 4000, warmup = 2000, chains = 4, cores = 4,
+          inits = 0,
+          data = dfsubb,
+          save_all_pars = T)
+
+summary(m0b_cloglog)
+
+# other link functions
+m0b_logit <-  update(m0b_cloglog,
+                    family = cumulative("logit"))
+
+m0b_probit <-  update(m0b_cloglog,
+                      family = cumulative("probit"))
+
+# compare different link functions
+m0b_logit <- add_criterion(m0b_logit,"loo")
+m0b_probit <- add_criterion(m0b_probit,"loo")
+m0b_cloglog <- add_criterion(m0b_cloglog ,"loo")
+print(loo_compare(m0b_logit, m0b_probit, m0b_cloglog, criterion="loo"), simplify = F)
+
+# chosen F distribution (link function)
+m0b <- m0b_cloglog
+```
+
+## BOREDOM mean
+
+```{r}
+# full model including FaceReader's estimate as predictor
+m1_bmean <-  update(m0b, formula. = ~ . + mean_boredom,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)), 
+                    newdata = dfsubb,
+                    save_all_pars = T)
+
+## model parameter
+summary(m1_bmean)
+
+# plots
+plot(marginal_effects(m1_bmean, "mean_boredom", categorical = F), points = T) 
+```
+
+## BOREDOM mean and SD
+```{r}
+# full model including FaceReader's estimates as predictor
+m1_bmeanxsd <-  update(m0b, formula. = ~ . + mean_boredom*sd_boredom,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                    newdata = dfsubb,
+                    save_all_pars = T)
+
+## model indicators 
+summary(m1_bmeanxsd)
+
+# plots
+plot(marginal_effects(m1_bmeanxsd,"mean_boredom:sd_boredom", categorical = F), points = T)
+
+## plot b densities and CIs
+m1_bmeanxsd_ggs <- ggs(m1_bmeanxsd) # transforms the brms output into a longformat tibble (used to make different types of plots)
+m1_bmeanxsd_ggs
+ggplot(filter(m1_bmeanxsd_ggs, Parameter == "b_mean_boredom:sd_boredom", Iteration>1000), aes(x=value)) +
+  geom_density(fill = "orange", alpha = .5) + geom_vline(xintercept = 0, col="red", size=1) +
+  scale_x_continuous(name="Value", limits=c(-1, 2)) + 
+  labs(title="Posterior density of regression coefficient for mean of FaceReader's boredom") +
+  theme_apa() + 
+  geom_vline(xintercept = summary(m1_bmeanxsd)$fixed[7,3:4], col="blue", linetype=2) # 95% CrI
+
+# 10-fold cross validation
+m0b <- add_criterion(m0b, criterion =  "kfold", folds = "grouped", group = "participant")
+m1_bmeanxsd <- add_criterion(m1_bmeanxsd, criterion = "kfold", folds = "grouped", group = "participant")
+print(loo_compare(m0b, m1_bmeanxsd, criterion = "kfold"), simplify = T) ## Estimating out-of sample predictions (via 10-fold cross validation) of the interaction model, compared to a model with no predictors yielded better results for the model without the interaction. Accordingly, we consider this potential interaction effect as irrelevant. 
+```
+
+## BOREDOM mean of peaks
+```{r}
+m1_bpeak <-  update(m0b, formula. = ~ . + peak10_boredom,
+                    prior = c(prior(normal(0, 10), class = b), 
+                              prior(cauchy(0, 10), class = sd)),
+                    newdata = dfsubb,
+                    save_all_pars = T)
+
+## model parameter 
+summary(m1_bpeak)
+
+# plots
+plot(marginal_effects(m1_bpeak,"peak10_boredom", categorical = F), points = T) 
+```
+
+# 3. VALENCE
+stronger priors for valence, as issues with convergence.
+## VALENCE restricted model
+```{r}
+## select complete cases of relevant variables
+dfsubv <- df %>% dplyr::select(participant, valence_post, mean_valence, sd_valence, peak10_valence_pos, peak10_valence_neg) %>% drop_na()
+
+# restricted model
+## probit-model
+m0v_probit <- brm(
+          valence_post ~ 1 + (1|participant),
+          family = cumulative("probit"),
+          prior = c(prior(normal(0, 1), class = Intercept), 
+                    prior(cauchy(0, 1), class = sd)),
+          iter = 4000, warmup = 2000, chains = 4, cores = 4,
+          control = list(adapt_delta = 0.99, max_treedepth = 15),
+          data = dfsubv,
+          inits = 0,
+          save_all_pars = T)
+summary(m0v_probit)
+
+# chosen F distribution (Link function)
+m0v <- m0v_probit
+```
+
+## VALENCE mean
+```{r}
+# full model including FaceReader's estimate as predictor
+m1_vmean <-  update(m0v, formula. = ~ . + mean_valence,
+                    prior = c(prior(normal(0, 1), class = Intercept),
+                              prior(normal(0, 1), class = b), 
+                              prior(cauchy(0, 1), class = sd)), 
+                    newdata = dfsubv,
+                    save_all_pars = T, 
+                    sample_prior = T)
+
+## model parameter
+summary(m1_vmean)
+
+# plots
+plot(marginal_effects(m1_vmean, "mean_valence", categorical = F), points = T, point_args = c(alpha = 0.8)) 
+```
+
+## VALENCE mean and SD
+```{r}
+# full model including FaceReader's estimates as predictor
+m1_vmeanxsd <-  update(m0v, formula. = ~ . + mean_valence*sd_valence,
+                    prior = c(prior(normal(0, 1), class = Intercept),
+                              prior(normal(0, 1), class = b), 
+                              prior(cauchy(0, 1), class = sd)),
+                    control = list(adapt_delta = 0.99, max_treedepth = 15),
+                    newdata = dfsubv,
+                    save_all_pars = T,
+                    sample_prior = T)
+
+## model parameter
+summary(m1_vmeanxsd)
+
+# plots
+plot(marginal_effects(m1_vmeanxsd,"mean_valence:sd_valence"), points = T) 
+```
+
+
+## VALENCE mean of peaks
+```{r}
+m1_vpeak <-  update(m0v, formula. = ~ . + peak10_valence_neg + peak10_valence_pos,
+                    prior = c(prior(normal(0, 1), class = Intercept),
+                              prior(normal(0, 1), class = b), 
+                              prior(cauchy(0, 1), class = sd)),
+                    newdata = dfsubv,
+                    save_all_pars = T)
+
+## model parameter 
+summary(m1_vpeak)
+
+# plots
+plot(marginal_effects(m1_vpeak,"peak10_valence_neg", categorical = F), points = T) 
+plot(marginal_effects(m1_vpeak,"peak10_valence_pos", categorical = F), points = T) 
+```
+
