@@ -8,17 +8,10 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval = T, warning = F, message = F)
+knitr::opts_chunk$set(echo = TRUE, eval = T, warning = F, message = F, cache = T, cache.path='cache/')
 ```
 
----
-title: "R Notebook"
-author: "Franziska Hirt"
-output:
-  pdf_document: default
----
-
-# PREPARATIONS
+# 1. PREPARATIONS
 ```{r}
 # load packages
 library(tidyverse)
@@ -107,7 +100,7 @@ df <- df %>%
 ```
 
 
-# 1. INTEREST
+# 2. INTEREST
 ## INTEREST restricted model
 ```{r}
 # complete cases only (drop NAs)
@@ -239,7 +232,7 @@ plot(marginal_effects(m1_ipeak_out,"peak10_interest", categorical = F), points =
 m1_peak <- m1_ipeak_out
 ```
 
-# 2. BOREDOM
+# 3. BOREDOM
 ## BOREDOM restricted model
 
 ```{r}
@@ -338,7 +331,7 @@ summary(m1_bpeak)
 plot(marginal_effects(m1_bpeak,"peak10_boredom", categorical = F), points = T) 
 ```
 
-# 3. VALENCE
+# 4. VALENCE
 stronger priors for valence, as issues with convergence.
 ## VALENCE restricted model
 ```{r}
