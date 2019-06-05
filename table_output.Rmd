@@ -37,7 +37,7 @@ table1
 # Code to generate latex code for table 2:
 ```{r eval=T}
 # rotate first column (named "x")
-df2x <- df2 %>% mutate(x = text_spec(x, "latex", angle = 90)) #, align = "c"
+df2x <- df2 %>% mutate(x = text_spec(x, "latex", angle = 90)) 
 
 
 # build table  

@@ -192,12 +192,12 @@ Boredom & 1.44 \newline (0.79; 1-5) & 0.06 \newline (0.15; 0-1) & 0.32 \newline 
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{# rotate first column (named "x")}
-\NormalTok{df2x <-}\StringTok{ }\NormalTok{df2 }\OperatorTok{%>%}\StringTok{ }\KeywordTok{mutate}\NormalTok{(}\DataTypeTok{x =} \KeywordTok{text_spec}\NormalTok{(x, }\StringTok{"latex"}\NormalTok{, }\DataTypeTok{angle =} \DecValTok{90}\NormalTok{)) }\CommentTok{#, align = "c"}
+\NormalTok{df2x <-}\StringTok{ }\NormalTok{df2 }\OperatorTok{%>%}\StringTok{ }\KeywordTok{mutate}\NormalTok{(}\DataTypeTok{x =} \KeywordTok{text_spec}\NormalTok{(x, }\StringTok{"latex"}\NormalTok{, }\DataTypeTok{angle =} \DecValTok{90}\NormalTok{)) }
 
 
 \CommentTok{# build table  }
 \NormalTok{table2 <-}\StringTok{ }\NormalTok{df2x }\OperatorTok{%>%}
-\StringTok{  }\KeywordTok{kable}\NormalTok{(}\DataTypeTok{align=}\KeywordTok{c}\NormalTok{(}\StringTok{"c"}\NormalTok{, }\KeywordTok{rep}\NormalTok{(}\StringTok{"l"}\NormalTok{,}\DecValTok{5}\NormalTok{)), }\DataTypeTok{escape =}\NormalTok{ F, }\DataTypeTok{booktabs =}\NormalTok{ T, }\DataTypeTok{caption =} \StringTok{"Overview of the regression coefficients"}\NormalTok{, }\DataTypeTok{col.names =} \KeywordTok{c}\NormalTok{(}\StringTok{" "}\NormalTok{, }\StringTok{"Model with aggregation method for FaceReader's estimates"}\NormalTok{, }\StringTok{"Regression coefficient"}\NormalTok{, }\StringTok{"Credible interval"}\NormalTok{, }\StringTok{"Number of observations"}\NormalTok{)) }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{kable}\NormalTok{(}\DataTypeTok{align=}\KeywordTok{c}\NormalTok{(}\StringTok{"c"}\NormalTok{, }\KeywordTok{rep}\NormalTok{(}\StringTok{"l"}\NormalTok{,}\DecValTok{5}\NormalTok{)), }\DataTypeTok{escape =}\NormalTok{ F, }\DataTypeTok{booktabs =}\NormalTok{ T, }\DataTypeTok{caption =} \StringTok{"Overview of the regression coefficients of the Bayesian Generalized Linear Mixed-Models"}\NormalTok{, }\DataTypeTok{col.names =} \KeywordTok{c}\NormalTok{(}\StringTok{" "}\NormalTok{, }\StringTok{"Model with aggregation method for FaceReader's estimates"}\NormalTok{, }\StringTok{"Regression coefficient"}\NormalTok{, }\StringTok{"Credible interval"}\NormalTok{, }\StringTok{"Number of observations"}\NormalTok{)) }\OperatorTok{%>%}
 \StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{1}\NormalTok{, }\DataTypeTok{width=}\StringTok{"0.8cm"}\NormalTok{) }\OperatorTok{%>%}\StringTok{ }
 \StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{2}\NormalTok{, }\DataTypeTok{width=}\StringTok{"7.0cm"}\NormalTok{) }\OperatorTok{%>%}
 \StringTok{  }\KeywordTok{column_spec}\NormalTok{(}\DecValTok{3}\NormalTok{, }\DataTypeTok{width=}\StringTok{"3.0cm"}\NormalTok{) }\OperatorTok{%>%}
@@ -213,7 +213,7 @@ Boredom & 1.44 \newline (0.79; 1-5) & 0.06 \newline (0.15; 0-1) & 0.32 \newline 
 
 \begin{table}[t]
 
-\caption{\label{tab:unnamed-chunk-3}Overview of the regression coefficients}
+\caption{\label{tab:unnamed-chunk-3}Overview of the regression coefficients of the Bayesian Generalized Linear Mixed-Models}
 \centering
 \begin{threeparttable}
 \begin{tabular}{>{\centering\arraybackslash}p{0.8cm}>{\raggedright\arraybackslash}p{7.0cm}>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{1.8cm}}
