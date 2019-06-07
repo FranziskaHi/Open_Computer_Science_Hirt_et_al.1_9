@@ -15,8 +15,6 @@ knitr::opts_chunk$set(echo = TRUE, eval = T, warning = F, message = F, cache = T
 ```{r}
 # load packages
 library(tidyverse)
-library(stats)
-library(scatr)
 library(jmv)
 library(rstan)
 library(brms)
@@ -34,18 +32,19 @@ options(mc.cores = parallel::detectCores())
 ```
 
 ## Selection of statistical methods
-- Bayesian statistics as more intuitive to interprete
+- Bayesian statistics, as they are more intuitive to interpret.
 
-- Mixed models, because events (level 1) nested within subjects (level 2). But only random intercepts included, as random effects when only two rows per participant are hardly identifyable.
+- Mixed models, because events (level 1) are nested within participants (level 2). However, only random intercepts are included for the participants, as additional random effects are hardly identifyable (when only two data rows per participant).
 
-- Treat emotional self-reports as ordinal outcome variables including edge effects in the data (i.e. many data points in the highest/lowest category). Cummulative family as we understand the Likert-scales as the categorization of a latent continuous construct (cf. Bürkner & Vuorre, 2019)
+- We did not control for the effect of the specific texts (6 different psychological topics). With only six levels, text does not work as an additional random intercept (level 2 variable). Introducing text as fixed effect (level 1 predictor), however, might be too conservative (the effect of the emotional differences between the texts would be removed).
 
-- Assummption of equal variances: "If unequal variances are theoretically possible -- and they usually are -- we also recommend incorporating them into the model" (Burkner & Vuorre, 2019). However, models allowing for unequal variances did not converge and were therefore omitted.
+- Treat emotional self-reports as ordinal outcome variables. Cummulative family in brms, as we understand the Likert-scales as the categorization of a latent continuous construct (Buerkner & Vuorre, 2019: https://journals.sagepub.com/doi/full/10.1177/2515245918823199).
 
-- Not controlling for the effect of the specific texts as not enough levels (6) for random effects and when introduced as level 2 predictor, too conservative (the effect of the emotional differences between the texts would be removed).
+- Assummption of equal variances: "If unequal variances are theoretically possible -- and they usually are -- we also recommend incorporating them into the model" (Buerkner & Vuorre, 2019). However, models allowing for unequal variances did not converge and were therefore omitted.
 
-### Choosing link family:
-link-distributions (usually only minor impact on results):
+
+### Choosing link function:
+link-distributions available for cummulative models in brms (usually only minor impact on results):
 logit = logistic,
 probit = gaussian,
 cloglog = extreme value distribution
@@ -60,12 +59,12 @@ https://stats.stackexchange.com/questions/20523/difference-between-logit-and-pro
 ### interpretation of summary of fitted model
 - Estimate is the mean of the posterior distribution, and corresponds to the frequentist point estimate
 - Est.Error is the standard deviation of the posterior distribution
-- thresholds in ordinal models are called "intercepts"
-marginal effects for ordinal models: https://github.com/paul-buerkner/brms/issues/190
+- thresholds in ordinal models are called "intercepts" in the output
+- Visualisation of marginal effects for ordinal models: https://github.com/paul-buerkner/brms/issues/190
 
-### posterior predictive checks
+### posterior predictive checks (not included in this document)
 for ordinal models pp_check not adequate: https://github.com/stan-dev/bayesplot/issues/73
-ppc: https://mc-stan.org/bayesplot/articles/graphical-ppcs.html
+--> use ppc: https://mc-stan.org/bayesplot/articles/graphical-ppcs.html
 
 ## load data
 ```{r }
@@ -77,7 +76,8 @@ df <- df %>% dplyr::rename("participant" = "subject_nr", "text" = "text_pic", "v
 ```
 
 
-## standardize predictors (helps for model convergence and for the interpretation of the interaction effects)
+## standardize predictors (aggregated from FaceReader)
+(helps for model convergence and for the interpretation of the interaction effects)
 ```{r}
 df <- df %>% 
   mutate(
@@ -130,7 +130,7 @@ m0i_probit <- add_criterion(m0i_probit,"loo", reloo = TRUE) #"reloo = TRUE" actu
 m0i_cloglog <- add_criterion(m0i_cloglog ,"loo", reloo = TRUE)
 print(loo_compare(m0i_logit, m0i_probit, m0i_cloglog, criterion="loo"), simplify = F)  # cloglog 1.5-3.5 SD better
 
-# chosen F distribution (Link function), final Null-Modell
+# chosen F distribution (link function) for final restricted model
 m0i <- m0i_cloglog
 ```
 
@@ -153,9 +153,8 @@ plot(marginal_effects(m1_imean, "mean_interest", method = "fitted", categorical 
 # Model without "outliers"
 dfsub_out <- dfsub %>% 
   filter(mean_interest < (mean(mean_interest) + 4*sd(mean_interest)) & mean_interest > (mean(mean_interest) - 4*sd(mean_interest))) 
-dfsub_out # two observations less
-
-dfsub %>% filter(mean_interest > (mean(mean_interest) + 4*sd(mean_interest)) | mean_interest < (mean(mean_interest) - 4*sd(mean_interest))) # ouliers are from one participant (highly expressive in video)
+# resulting in two observations less
+# dfsub %>% filter(mean_interest > (mean(mean_interest) + 4*sd(mean_interest)) | mean_interest < (mean(mean_interest) - 4*sd(mean_interest))) # ouliers are from one participant (highly expressive in video)
 
 
 m1_imean_out <-  update(m0i, formula. = ~ . + mean_interest,
@@ -169,16 +168,14 @@ summary(m1_imean_out)
 ## plots    
 plot(marginal_effects(m1_imean_out, "mean_interest", method = "fitted", categorical = F), points = T)
 
-# chose final model
+# choose final model
 m1_imean <- m1_imean_out
 ```
 
-
-
-## INTEREST SD * mean
+## INTEREST mean*SD
 ```{r}
-# the participant from before also outlier in SD? --> No! --> leave it in
-dfsub_out %>% filter(sd_interest > (mean(sd_interest) + 4*sd(sd_interest)) | sd_interest < (mean(sd_interest) - 4*sd(mean_interest))) # ouliers are from one participant (highly expressive in video)
+# the participant from before also outlier in SD? --> No.
+#dfsub_out %>% filter(sd_interest > (mean(sd_interest) + 4*sd(sd_interest)) | sd_interest < (mean(sd_interest) - 4*sd(sd_interest)))
 
 
 # full model including FaceReader's estimates as predictor
@@ -200,11 +197,9 @@ plot(marginal_effects(m1_imeanxsd,"sd_interest"), points = T, point_args = list(
 
 ## INTEREST mean of peaks
 ```{r}
-#remove outliers from mean also in peak:
+# remove outliers from mean also in peak:
 dfsub_outpeak <- dfsub %>% filter(peak10_interest < (mean(peak10_interest) + 4*sd(peak10_interest)) & peak10_interest > (mean(peak10_interest) - 4*sd(peak10_interest))) 
-dfsub_outpeak
-
-dfsub %>% filter(peak10_interest > (mean(peak10_interest) + 4*sd(peak10_interest)) | peak10_interest < (mean(peak10_interest) - 4*sd(peak10_interest)))  # 2 ouliers are from the same participant as before
+# dfsub %>% filter(peak10_interest > (mean(peak10_interest) + 4*sd(peak10_interest)) | peak10_interest < (mean(peak10_interest) - 4*sd(peak10_interest)))  # 2 ouliers are from the same participant as before
 
 # model including outliers
 m1_ipeak <- update(m0i, formula. = ~ . + peak10_interest,
@@ -229,12 +224,12 @@ summary(m1_ipeak_out)
 plot(marginal_effects(m1_ipeak,"peak10_interest", categorical = F), points = T) 
 plot(marginal_effects(m1_ipeak_out,"peak10_interest", categorical = F), points = T)
 
+# define final model
 m1_peak <- m1_ipeak_out
 ```
 
 # 3. BOREDOM
 ## BOREDOM restricted model
-
 ```{r}
 # complete cases only (drop NAs)
 dfsubb <- df %>% dplyr::select(participant, bored_post, mean_boredom, sd_boredom, peak10_boredom) %>% drop_na()
@@ -269,7 +264,6 @@ m0b <- m0b_cloglog
 ```
 
 ## BOREDOM mean
-
 ```{r}
 # full model including FaceReader's estimate as predictor
 m1_bmean <-  update(m0b, formula. = ~ . + mean_boredom,
@@ -285,7 +279,7 @@ summary(m1_bmean)
 plot(marginal_effects(m1_bmean, "mean_boredom", categorical = F), points = T) 
 ```
 
-## BOREDOM mean and SD
+## BOREDOM mean*SD
 ```{r}
 # full model including FaceReader's estimates as predictor
 m1_bmeanxsd <-  update(m0b, formula. = ~ . + mean_boredom*sd_boredom,
@@ -300,7 +294,7 @@ summary(m1_bmeanxsd)
 # plots
 plot(marginal_effects(m1_bmeanxsd,"mean_boredom:sd_boredom", categorical = F), points = T)
 
-## plot b densities and CIs
+## plot densities and CIs of regression coefficient
 m1_bmeanxsd_ggs <- ggs(m1_bmeanxsd) # transforms the brms output into a longformat tibble (used to make different types of plots)
 m1_bmeanxsd_ggs
 ggplot(filter(m1_bmeanxsd_ggs, Parameter == "b_mean_boredom:sd_boredom", Iteration>1000), aes(x=value)) +
@@ -374,7 +368,7 @@ summary(m1_vmean)
 plot(marginal_effects(m1_vmean, "mean_valence", categorical = F), points = T, point_args = c(alpha = 0.8)) 
 ```
 
-## VALENCE mean and SD
+## VALENCE mean*SD
 ```{r}
 # full model including FaceReader's estimates as predictor
 m1_vmeanxsd <-  update(m0v, formula. = ~ . + mean_valence*sd_valence,
