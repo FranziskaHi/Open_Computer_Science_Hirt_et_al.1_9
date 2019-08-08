@@ -3,12 +3,12 @@ title: 'Analyses for the paper: Measuring emotions during learning'
 author: "Franziska Hirt"
 date: "23 Mai 2019"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval = T, warning = F, message = F, cache = T, cache.path='cache/')
+knitr::opts_chunk$set(echo = T, eval = T, warning = F, message = F, cache = T, cache.path='cache/')
 ```
 
 # 1. PREPARATIONS
@@ -21,16 +21,14 @@ library(bayesplot)
 library(ggmcmc) # for ggs posterior plot
 
 # set rstan options
-rstan::rstan_options(auto_write = TRUE)
+rstan::rstan_options(auto_write = T)
 options(mc.cores = parallel::detectCores())
 ```
 
 ## Selection of statistical methods
 - Bayesian statistics, as they are more intuitive to interpret.
 
-- Mixed models, because events (level 1) are nested within participants (level 2). However, only random intercepts are included for the participants, as additional random effects are hardly identifyable (when only two data rows per participant).
-
-- We did not control for the effect of the specific texts (6 different psychological topics). With only six levels, text does not work as an additional random intercept (level 2 variable). Introducing text as fixed effect (level 1 predictor), however, might be too conservative (the effect of the emotional differences between the texts would be removed).
+- Mixed models, because events (level 1) are nested within participants (level 2) and texts (level2). However, only random intercepts are included, as additional random effects would be hardly identifyable.
 
 - Treat emotional self-reports as ordinal outcome variables. Cummulative family in brms, as we understand the Likert-scales as the categorization of a latent continuous construct (Buerkner & Vuorre, 2019: https://journals.sagepub.com/doi/full/10.1177/2515245918823199).
 
@@ -98,17 +96,17 @@ df <- df %>%
 ## INTEREST restricted model
 ```{r}
 # complete cases only (drop NAs)
-dfsub <- df %>% select(participant, interested_post, mean_interest, sd_interest, peak10_interest) %>% drop_na()
+dfsub <- df %>% select(participant, interested_post, mean_interest, sd_interest, peak10_interest, text) %>% drop_na()
 
 # restricted model
 m0i_cloglog <- brm(
-          interested_post ~ 1 + (1|participant),
+          interested_post ~ 1 + (1|participant) + (1|text),
           family = cumulative("cloglog"),                    
           prior = prior(cauchy(0, 10), class = sd), 
           iter = 4000, warmup = 2000, chains = 4, cores = 4,
           inits = 0,
           data = dfsub,
-          save_all_pars = T) # needed for bayes factor later on
+          save_all_pars = T) # needed for bayes factor
 
 summary(m0i_cloglog)
 
@@ -120,8 +118,8 @@ m0i_probit <-  update(m0i_cloglog,
                       family = cumulative("probit"))
 # compare different link functions using assimilation of leave-one-out-cross validation (looic)
 m0i_logit <- add_criterion(m0i_logit,"loo")
-m0i_probit <- add_criterion(m0i_probit,"loo", reloo = TRUE) #"reloo = TRUE" actually calculates MCMC for problematic observations 
-m0i_cloglog <- add_criterion(m0i_cloglog ,"loo", reloo = TRUE)
+m0i_probit <- add_criterion(m0i_probit,"loo", reloo = T) #"reloo = T" actually calculates MCMC for problematic observations 
+m0i_cloglog <- add_criterion(m0i_cloglog ,"loo", reloo = T)
 print(loo_compare(m0i_logit, m0i_probit, m0i_cloglog, criterion="loo"), simplify = F)  # cloglog 1.5-3.5 SD better
 
 # chosen F distribution (link function) for final restricted model
@@ -135,8 +133,7 @@ m1_imean <-  update(m0i, formula. = ~ . + mean_interest,
                     prior = c(prior(normal(0, 10), class = b), 
                               prior(cauchy(0, 10), class = sd)), 
                     newdata = dfsub,
-                    save_all_pars = T, 
-                    sample_prior = TRUE)
+                    save_all_pars = T)
 
 ## model parameter
 summary(m1_imean)
@@ -155,8 +152,7 @@ m1_imean_out <-  update(m0i, formula. = ~ . + mean_interest,
                     prior = c(prior(normal(0, 10), class = b), 
                               prior(cauchy(0, 10), class = sd)), 
                     newdata = dfsub_out,
-                    save_all_pars = T, 
-                    sample_prior = TRUE)
+                    save_all_pars = T)
 summary(m1_imean_out)
 
 ## plots    
@@ -176,7 +172,6 @@ m1_imean <- m1_imean_out
 m1_imeanxsd <-  update(m0i, formula. = ~ . + mean_interest*sd_interest,
                     prior = c(prior(normal(0, 10), class = b), 
                               prior(cauchy(0, 10), class = sd)),
-                    control = list(adapt_delta = 0.99),
                     newdata = dfsub_out, # without outliers of mean interest
                     save_all_pars = T)
 
@@ -191,7 +186,7 @@ plot(marginal_effects(m1_imeanxsd,"sd_interest", categorical = F), points = T, p
 
 ## INTEREST mean of peaks
 ```{r}
-# remove outliers from mean also in peak:
+# remove outliers also in peak when from the same participant as in mean:
 dfsub_outpeak <- dfsub %>% filter(peak10_interest < (mean(peak10_interest) + 4*sd(peak10_interest)) & peak10_interest > (mean(peak10_interest) - 4*sd(peak10_interest))) 
 # dfsub %>% filter(peak10_interest > (mean(peak10_interest) + 4*sd(peak10_interest)) | peak10_interest < (mean(peak10_interest) - 4*sd(peak10_interest)))  # 2 ouliers are from the same participant as before
 
@@ -208,7 +203,6 @@ m1_ipeak_out <- update(m0i, formula. = ~ . + peak10_interest,
                     prior = c(prior(normal(0, 10), class = b), 
                               prior(cauchy(0, 10), class = sd)),
                               newdata = dfsub_outpeak,
-                              control = list(adapt_delta = 0.99),
                               save_all_pars = T)
 
 ## model parameter 
@@ -226,14 +220,15 @@ m1_peak <- m1_ipeak_out
 ## BOREDOM restricted model
 ```{r}
 # complete cases only (drop NAs)
-dfsubb <- df %>% select(participant, bored_post, mean_boredom, sd_boredom, peak10_boredom) %>% drop_na()
+dfsubb <- df %>% select(participant, bored_post, mean_boredom, sd_boredom, peak10_boredom, text) %>% drop_na()
 
 # restricted model
 m0b_cloglog <- brm(
-          bored_post ~ 1 + (1|participant),
+          bored_post ~ 1 + (1|participant) + (1|text),
           family = cumulative("cloglog"),
           prior = prior(cauchy(0, 10), class = sd),
           iter = 4000, warmup = 2000, chains = 4, cores = 4,
+          control = list(adapt_delta = 0.99),
           inits = 0,
           data = dfsubb,
           save_all_pars = T)
@@ -281,6 +276,7 @@ m1_bmeanxsd <-  update(m0b, formula. = ~ . + mean_boredom*sd_boredom,
                               prior(cauchy(0, 10), class = sd)),
                     newdata = dfsubb,
                     save_all_pars = T)
+                    
 
 ## model indicators 
 summary(m1_bmeanxsd)
@@ -324,23 +320,23 @@ stronger priors for valence, as issues with convergence.
 ## VALENCE restricted model
 ```{r}
 ## select complete cases of relevant variables
-dfsubv <- df %>% select(participant, valence_post, mean_valence, sd_valence, peak10_valence_pos, peak10_valence_neg) %>% drop_na()
+dfsubv <- df %>% select(participant, valence_post, mean_valence, sd_valence, peak10_valence_pos, peak10_valence_neg, text) %>% drop_na()
 
 # restricted model
 ## probit-model
 m0v_probit <- brm(
-          valence_post ~ 1 + (1|participant),
+          valence_post ~ 1 + (1|participant) + (1|text), 
           family = cumulative("probit"),
           prior = c(prior(normal(0, 1), class = Intercept), 
                     prior(cauchy(0, 1), class = sd)),
           iter = 4000, warmup = 2000, chains = 4, cores = 4,
-          control = list(adapt_delta = 0.99, max_treedepth = 15),
-          data = dfsubv,
+          control = list(adapt_delta = 0.999, max_treedepth = 15), 
           inits = 0,
+          data = dfsubv,
           save_all_pars = T)
 summary(m0v_probit)
 
-# chosen F distribution (Link function)
+# chosen F distribution (link function)
 m0v <- m0v_probit
 ```
 
@@ -352,8 +348,7 @@ m1_vmean <-  update(m0v, formula. = ~ . + mean_valence,
                               prior(normal(0, 1), class = b), 
                               prior(cauchy(0, 1), class = sd)), 
                     newdata = dfsubv,
-                    save_all_pars = T, 
-                    sample_prior = T)
+                    save_all_pars = T)
 
 ## model parameter
 summary(m1_vmean)
@@ -369,11 +364,10 @@ m1_vmeanxsd <-  update(m0v, formula. = ~ . + mean_valence*sd_valence,
                     prior = c(prior(normal(0, 1), class = Intercept),
                               prior(normal(0, 1), class = b), 
                               prior(cauchy(0, 1), class = sd)),
-                    control = list(adapt_delta = 0.99, max_treedepth = 15),
                     newdata = dfsubv,
-                    save_all_pars = T,
-                    sample_prior = T)
-
+                    save_all_pars = T)
+                    
+        
 ## model parameter
 summary(m1_vmeanxsd)
 
