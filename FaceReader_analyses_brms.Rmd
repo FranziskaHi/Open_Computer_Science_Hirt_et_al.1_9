@@ -4,15 +4,16 @@ author: "Franziska Hirt"
 date: "23 Mai 2019"
 output:
   pdf_document: default
-  html_document: default
+  
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = F}
 knitr::opts_chunk$set(echo = T, eval = T, warning = F, message = F, cache = T, cache.path='cache/')
+qwraps2::lazyload_cache_dir(path = 'cache/')
 ```
 
 # 1. PREPARATIONS
-```{r}
+```{r cache = F}
 # load packages
 library(tidyverse)
 library(rstan)
@@ -104,6 +105,7 @@ m0i_cloglog <- brm(
           family = cumulative("cloglog"),                    
           prior = prior(cauchy(0, 10), class = sd), 
           iter = 4000, warmup = 2000, chains = 4, cores = 4,
+          control = list(adapt_delta = 0.99),
           inits = 0,
           data = dfsub,
           save_all_pars = T) # needed for bayes factor
@@ -117,12 +119,12 @@ m0i_logit <-  update(m0i_cloglog,
 m0i_probit <-  update(m0i_cloglog,
                       family = cumulative("probit"))
 # compare different link functions using assimilation of leave-one-out-cross validation (looic)
-m0i_logit <- add_criterion(m0i_logit,"loo")
-m0i_probit <- add_criterion(m0i_probit,"loo", reloo = T) #"reloo = T" actually calculates MCMC for problematic observations 
+m0i_logit <- add_criterion(m0i_logit,"loo", reloo = T) #"reloo = T" actually calculates MCMC for problematic observations 
+m0i_probit <- add_criterion(m0i_probit,"loo", reloo = T) 
 m0i_cloglog <- add_criterion(m0i_cloglog ,"loo", reloo = T)
 print(loo_compare(m0i_logit, m0i_probit, m0i_cloglog, criterion="loo"), simplify = F)  # cloglog 1.5-3.5 SD better
 
-# chosen F distribution (link function) for final restricted model
+# chosen response distribution (link function) for final restricted model
 m0i <- m0i_cloglog
 ```
 
@@ -146,7 +148,6 @@ dfsub_out <- dfsub %>%
   filter(mean_interest < (mean(mean_interest) + 4*sd(mean_interest)) & mean_interest > (mean(mean_interest) - 4*sd(mean_interest))) 
 # resulting in two observations less
 # dfsub %>% filter(mean_interest > (mean(mean_interest) + 4*sd(mean_interest)) | mean_interest < (mean(mean_interest) - 4*sd(mean_interest))) # ouliers are from one participant (highly expressive in video)
-
 
 m1_imean_out <-  update(m0i, formula. = ~ . + mean_interest,
                     prior = c(prior(normal(0, 10), class = b), 
@@ -179,9 +180,9 @@ m1_imeanxsd <-  update(m0i, formula. = ~ . + mean_interest*sd_interest,
 summary(m1_imeanxsd)
 
 # plots
-plot(marginal_effects(m1_imeanxsd,"mean_interest:sd_interest", categorical = F), points = T, point_args = list(alpha = 0.6)) 
-plot(marginal_effects(m1_imeanxsd,"mean_interest", categorical = F), points = T, point_args = list(alpha = 0.6)) 
-plot(marginal_effects(m1_imeanxsd,"sd_interest", categorical = F), points = T, point_args = list(alpha = 0.6)) 
+plot(marginal_effects(m1_imeanxsd,"mean_interest:sd_interest", categorical = F), points = T) 
+plot(marginal_effects(m1_imeanxsd,"mean_interest", categorical = F), points = T) 
+plot(marginal_effects(m1_imeanxsd,"sd_interest", categorical = F), points = T) 
 ```
 
 ## INTEREST mean of peaks
@@ -248,7 +249,7 @@ m0b_probit <- add_criterion(m0b_probit,"loo")
 m0b_cloglog <- add_criterion(m0b_cloglog ,"loo")
 print(loo_compare(m0b_logit, m0b_probit, m0b_cloglog, criterion="loo"), simplify = F)
 
-# chosen F distribution (link function)
+# chosen response distribution (link function)
 m0b <- m0b_cloglog
 ```
 
@@ -286,12 +287,10 @@ plot(marginal_effects(m1_bmeanxsd,"mean_boredom:sd_boredom", categorical = F), p
 
 ## plot densities and CIs of regression coefficient
 m1_bmeanxsd_ggs <- ggs(m1_bmeanxsd) # transforms the brms output into a longformat tibble (used to make different types of plots)
-m1_bmeanxsd_ggs
 ggplot(filter(m1_bmeanxsd_ggs, Parameter == "b_mean_boredom:sd_boredom", Iteration>1000), aes(x=value)) +
   geom_density(fill = "orange", alpha = .5) + geom_vline(xintercept = 0, col="red", size=1) +
   scale_x_continuous(name="Value", limits=c(-1, 2)) + 
   labs(title="Posterior density of regression coefficient for mean of FaceReader's boredom") +
-  theme_apa() + 
   geom_vline(xintercept = summary(m1_bmeanxsd)$fixed[7,3:4], col="blue", linetype=2) # 95% CrI
 
 # 10-fold cross validation
@@ -336,7 +335,7 @@ m0v_probit <- brm(
           save_all_pars = T)
 summary(m0v_probit)
 
-# chosen F distribution (link function)
+# chosen response distribution (link function)
 m0v <- m0v_probit
 ```
 
@@ -364,8 +363,11 @@ m1_vmeanxsd <-  update(m0v, formula. = ~ . + mean_valence*sd_valence,
                     prior = c(prior(normal(0, 1), class = Intercept),
                               prior(normal(0, 1), class = b), 
                               prior(cauchy(0, 1), class = sd)),
+                    control = list(adapt_delta = 0.999, max_treedepth = 15), 
+                    inits = 0,
                     newdata = dfsubv,
-                    save_all_pars = T)
+                    save_all_pars = T,
+                    seed = 21) # for reproducibility (on the same machine) - to avoid divergent transitions which sometimes occured
                     
         
 ## model parameter
