@@ -6,6 +6,7 @@ df_TEEM_final.csv
 .png
 .log
 .html
+.Rproj
 cache
 FaceReader_analyses_brms_files
 FaceReader_analyses_brms.md
