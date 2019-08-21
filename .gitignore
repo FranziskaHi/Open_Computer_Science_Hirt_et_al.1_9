@@ -12,4 +12,3 @@ FaceReader_analyses_brms_files
 FaceReader_analyses_brms.md
 FaceReader_analyses_brms.html
 .csv
-git rm -r --cached debug.log nbproject
