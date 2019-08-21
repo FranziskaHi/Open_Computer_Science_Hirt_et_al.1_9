@@ -1,10 +1,11 @@
 ---
 title: 'Analyses for the paper: Measuring emotions during learning'
 author: "Franziska Hirt"
-date: "23 Mai 2019"
+date: "19 August 2019"
 output:
-  pdf_document: default
-  
+  html_document:
+    self_contained: no # so that plots are saved
+    keep_md: true
 ---
 
 ```{r setup, include = F}
@@ -29,12 +30,11 @@ options(mc.cores = parallel::detectCores())
 ## Selection of statistical methods
 - Bayesian statistics, as they are more intuitive to interpret.
 
-- Mixed models, because events (level 1) are nested within participants (level 2) and texts (level2). However, only random intercepts are included, as additional random effects would be hardly identifyable.
+- Mixed models, because events (level 1) are nested within participants (level 2) and texts (level 2). However, only random intercepts are included, as additional random effects would be hardly identifyable.
 
 - Treat emotional self-reports as ordinal outcome variables. Cummulative family in brms, as we understand the Likert-scales as the categorization of a latent continuous construct (Buerkner & Vuorre, 2019: https://journals.sagepub.com/doi/full/10.1177/2515245918823199).
 
 - Assummption of equal variances: "If unequal variances are theoretically possible -- and they usually are -- we also recommend incorporating them into the model" (Buerkner & Vuorre, 2019). However, models allowing for unequal variances did not converge and were therefore omitted.
-
 
 ### Choosing link function:
 link-distributions available for cummulative models in brms (usually only minor impact on results):
@@ -285,15 +285,15 @@ summary(m1_bmeanxsd)
 # plots
 plot(marginal_effects(m1_bmeanxsd,"mean_boredom:sd_boredom", categorical = F), points = T, point_args = c(alpha = 0.8))
 
-## plot densities and CIs of regression coefficient
+## plot densities and CIs of interaction-effect
 m1_bmeanxsd_ggs <- ggs(m1_bmeanxsd) # transforms the brms output into a longformat tibble (used to make different types of plots)
 ggplot(filter(m1_bmeanxsd_ggs, Parameter == "b_mean_boredom:sd_boredom", Iteration>1000), aes(x=value)) +
   geom_density(fill = "orange", alpha = .5) + geom_vline(xintercept = 0, col="red", size=1) +
   scale_x_continuous(name="Value", limits=c(-1, 2)) + 
-  labs(title="Posterior density of regression coefficient for mean of FaceReader's boredom") +
+  labs(title="Posterior density of interaction-effect") +
   geom_vline(xintercept = summary(m1_bmeanxsd)$fixed[7,3:4], col="blue", linetype=2) # 95% CrI
 
-# 10-fold cross validation
+# 10-fold cross validation: interaction model compared to restricted model
 m0b <- add_criterion(m0b, criterion =  "kfold", folds = "grouped", group = "participant")
 m1_bmeanxsd <- add_criterion(m1_bmeanxsd, criterion = "kfold", folds = "grouped", group = "participant")
 print(loo_compare(m0b, m1_bmeanxsd, criterion = "kfold"), simplify = T) ## Estimating out-of sample predictions (via 10-fold cross validation) of the interaction model, compared to a model with no predictors yielded better results for the model without the interaction. Accordingly, we consider this potential interaction effect as irrelevant. 
@@ -347,7 +347,8 @@ m1_vmean <-  update(m0v, formula. = ~ . + mean_valence,
                               prior(normal(0, 1), class = b), 
                               prior(cauchy(0, 1), class = sd)), 
                     newdata = dfsubv,
-                    save_all_pars = T)
+                    save_all_pars = T,
+                    seed = 19) # for reproducibility (on the same machine) - to avoid "Stan model x does not contain samples." which sometimes occured
 
 ## model parameter
 summary(m1_vmean)
